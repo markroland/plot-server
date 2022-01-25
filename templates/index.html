@@ -11,25 +11,66 @@
         Select a sketch
     </div>
 
+    <div class="plotter">
+        <button id="submit_plot" type="button">Plot</button>
+    </div>
+
     <div class="file_list">
         <ul id="files">
         {% for f in files %}
-            <li><a href="/static/sketches/{{f}}">{{f}}</a></li>
+            <li><a href="/static/sketches/{{f}}" data-filename="{{f}}">{{f}}</a></li>
         {% endfor %}
         </ul>
     </div>
 
     <script>
+
+        // Add event handler to each file link
         document.querySelectorAll("#files a").forEach(item => {
             item.addEventListener("click", function(event){
+
+                // Clear any "selected" list items
                 document.querySelectorAll('ul#files li.selected').forEach((el) => el.classList.remove('selected'));
+
+                // Apply class to highlight clicked item
                 event.target.parentElement.classList.add('selected');
-                let filename = this.getAttribute("href");
-                document.querySelector("div.artwork").innerHTML = '<img src="' + filename + '" alt="" />'
-                    + '<div style="text-align: center">' + filename + '</div>'
+
+                // Parse file request
+                let filepath = this.getAttribute("href");
+                let filename = this.getAttribute("data-filename");
+
+                // Insert an image request
+                document.querySelector("div.artwork").innerHTML = '<img src="' + filepath + '" alt="" />'
+                    + '<div style="text-align: center">' + filename + '</div>';
+
+                // Set the value on the plot button
+                document.querySelector("#submit_plot").setAttribute("value", filename);
+
+                // Stop link from loading a page request
                 event.preventDefault();
             })
         });
+
+        // Add event handler to Plot button
+        document.querySelector('#submit_plot').addEventListener("click", function(event){
+
+            send_plot_request(this.getAttribute("value"));
+
+            event.preventDefault();
+        });
+
+        // Send an API request
+        function send_plot_request(filename){
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/plot/' + filename);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    console.log(xhr.responseText);
+                }
+            };
+            xhr.send();
+        }
+
     </script>
 
 </body>

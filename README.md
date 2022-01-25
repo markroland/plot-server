@@ -15,6 +15,10 @@ cd ./static
 ln -s {ART_DIRECTORY} sketches
 ```
 
+### Install the AxiDraw Python module and CLI
+
+See instructions on [AxiDraw.com](https://axidraw.com/doc/py_api).
+
 ## Run
 
 ```
