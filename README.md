@@ -1,5 +1,9 @@
 # Plot Server
 
+The purpose of this project is to provide a web-based interface for starting plots
+with an AxiDraw plotter. It looks at a folder of SVG images, and provides controls
+for viewing and plotting them.
+
 ## Installation
 
 ### Copy .env.example to .env
@@ -36,3 +40,8 @@ Keep running in background if shell session ends:
 ```
 nohup python index.py > /dev/null 2>&1 &
 ```
+
+## Connect
+
+Open the URL initiated by Flask in your web browser. It should be your local IP
+address followed by the port, so something like `http://192.168.0.10:5007`.
