@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Plots</title>
+    <meta name="viewport" content="width = device-width, initial-scale = 1, maximum-scale = 1" />
+    <link rel="stylesheet" type="text/css" href="/static/style.css">
+</head>
+<body>
+    <div class="artwork">
+        Select a sketch
+    </div>
+
+    <div class="file_list">
+        <ul id="files">
+        {% for f in files %}
+            <li><a href="/static/sketches/{{f}}">{{f}}</a></li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <script>
+        document.querySelectorAll("#files a").forEach(item => {
+            item.addEventListener("click", function(event){
+                document.querySelectorAll('ul#files li.selected').forEach((el) => el.classList.remove('selected'));
+                event.target.parentElement.classList.add('selected');
+                let filename = this.getAttribute("href");
+                document.querySelector("div.artwork").innerHTML = '<img src="' + filename + '" alt="" />'
+                    + '<div style="text-align: center">' + filename + '</div>'
+                event.preventDefault();
+            })
+        });
+    </script>
+
+</body>
+</html>

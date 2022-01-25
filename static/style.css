@@ -1,0 +1,34 @@
+div.artwork {
+  background: rgb(255, 255, 255);
+  border: 1px solid black;
+  padding: 1em;
+  height: 432px;
+  max-width: 576px;
+  margin:  0 auto;
+}
+
+div.file_list {
+  padding:  1em;
+  border:  1px solid black;
+  width:  576px;
+  margin:  0 auto;
+  height: 20em;
+  overflow-y: scroll;
+}
+
+ul#files li {
+  padding-bottom:  0.25em;
+}
+
+ul#files li.selected {
+  background-color: rgb(255,255,128);
+}
+
+div.plotter {
+  border-left:  1px solid black;
+  border-right:  1px solid black;
+  padding:  1em;
+  width:  576px;
+  margin:  0 auto;
+  text-align: center;
+}
