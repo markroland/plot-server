@@ -16,18 +16,25 @@
 </head>
 <body>
     <div class="artwork">
+        <object id="svg-object" data="" type="image/svg+xml"></object>
+        <!-- <img src="/static/sketches/radial-lines-1.svg" alt="" /> -->
     </div>
 
     <div class="plotter">
-        <button id="submit_plot" type="button">Plot</button>
+        <form name="plot" action="">
+            <label for="layer">Select Layer(s)</label>
+            <select name="layer"></select>
+            <input type="hidden" name="filename" value="" />
+            <button id="submit_plot" type="submit">Plot</button>
+        </form>
     </div>
 
     <div class="file_list">
-        <ul id="files">
+        <ol id="files">
         {% for f in files %}
             <li><a href="/static/sketches/{{f}}" data-filename="{{f}}">{{f}}</a></li>
         {% endfor %}
-        </ul>
+        </ol>
     </div>
 
     <script>
@@ -37,7 +44,7 @@
             item.addEventListener("click", function(event){
 
                 // Clear any "selected" list items
-                document.querySelectorAll('ul#files li.selected').forEach((el) => el.classList.remove('selected'));
+                document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
 
                 // Apply class to highlight clicked item
                 event.target.parentElement.classList.add('selected');
@@ -47,29 +54,105 @@
                 let filename = this.getAttribute("data-filename");
 
                 // Insert an image request
-                document.querySelector("div.artwork").innerHTML = '<img src="' + filepath + '" alt="" />'
-                    + '<div style="text-align: center">' + filename + '</div>';
+                // document.querySelector("div.artwork").innerHTML =  '<div id="filename"><p>' + filename + '</p></div>'
+                //     + '<img src="' + filepath + '" alt="" />';
+                document.querySelector("#svg-object").setAttribute("data", filepath);
 
-                // Set the value on the plot button
-                document.querySelector("#submit_plot").setAttribute("value", filename);
+                // Set a data attribute for just the filename
+                // This is only to avoid parsing the full request path later
+                document.querySelector("#svg-object").setAttribute("data-filename", filename);
+                // document.querySelector("#submit_plot").setAttribute("value", filename);
 
                 // Stop link from loading a page request
                 event.preventDefault();
             })
         });
 
-        // Add event handler to Plot button
-        document.querySelector('#submit_plot').addEventListener("click", function(event){
+        // Extract information about the SVG file after it has loaded
+        document.querySelector("#svg-object").addEventListener("load", function() {
 
-            send_plot_request(this.getAttribute("value"));
+            // Load SVG content
+            var svgObject = document.getElementById('svg-object').contentDocument;
+
+            // var parser = new DOMParser();
+            // var doc = parser.parseFromString(svgObject, "image/svg+xml");
+
+            // Look for group (<g>) tags with the "inkscape:label" that denotes
+            // an AxiDraw layer
+            var groups = svgObject.querySelectorAll('g');
+            let layers = [];
+            let layer_regex = new RegExp(/^\d/);
+            groups.forEach((item) => {
+                if (item.hasAttribute("inkscape:label")) {
+                    let layer_name = item.getAttribute("inkscape:label");
+                    if (layer_regex.test(layer_name)) {
+                        layers.push(layer_name);
+                    }
+                }
+            });
+
+            // Set filename on hidden form element
+            document.querySelector("form[name=plot] input[name=filename]").value = this.getAttribute('data-filename');
+
+            // Build a Form menu to select a layer
+            let select_menu = document.querySelector("select[name=layer]")
+
+            // Clear any existing values from the option menu
+            var length = select_menu.options.length;
+            for (i = length-1; i >= 0; i--) {
+                select_menu.options[i] = null;
+            }
+
+            // Set the options based on the current SVG's layers
+            let opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "All";
+            select_menu.appendChild(opt);
+            layers.forEach((item) => {
+                let opt = document.createElement("option");
+                let layer_number = item.match(/^(\d+)/)[0];
+                opt.value = layer_number;
+                opt.textContent = item;
+                select_menu.appendChild(opt);
+            });
+        });
+
+        // Add event handler to Plot button
+        // document.querySelector('#submit_plot').addEventListener("click", function(event){
+        document.querySelector('form[name=plot]').addEventListener("submit", function(event){
+
+            // Get plot filename
+            let filename = document.querySelector("form[name=plot] input[name=filename]").value;
+
+            // Get selected layer. Set to null if "all" layers (empty value) should be plotted
+            let layer = document.querySelector("select[name=layer]").value;
+            if (layer == "") {
+                layer = null;
+            }
+
+            // Set plot request
+            send_plot_request(filename, layer);
 
             event.preventDefault();
         });
 
-        // Send an API request
-        function send_plot_request(filename){
+        // Load the first sketch from the list on page load
+        window.addEventListener("load", function() {
+            let first_sketch = document.querySelector('ol#files li a');
+            let filename = first_sketch.getAttribute('data-filename');
+            let filepath = "/static/sketches/" + filename;
+            document.querySelector("#svg-object").setAttribute("data", filepath);
+            document.querySelector("#svg-object").setAttribute("data-filename", filename);
+        });
+
+        // Send an API request to start a plot
+        function send_plot_request(filename, layer = null){
+            let request = '/plot/' + filename;
+            if (layer != null) {
+                request += "?layer=" + layer;
+            }
             var xhr = new XMLHttpRequest();
-            xhr.open('GET', '/plot/' + filename);
+            xhr.open('GET', request);
             xhr.onload = function() {
                 if (xhr.status === 200) {
                     console.log(xhr.responseText);
