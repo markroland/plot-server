@@ -52,16 +52,29 @@ def plot(file):
         # other incoming requests until the plotter is done
         if sem.acquire(True, 0.1):
 
+            # Determine requested layer
+            layer = request.args.get("layer", default=0, type=int)
+
             # Load file & configure plot context
             ad.plot_setup(filepath)
+            ad.options.mode = "plot"
+
+            if layer > 0:
+                ad.options.mode = "layers"
+                ad.options.layer = layer
 
             # Plot the file
+            ad.plot_run()
+
+            # Turn off motors
+            ad.options.mode = "manual"
+            ad.options.manual_cmd = "disable_xy"
             ad.plot_run()
 
             # Release the Semaphore
             sem.release()
 
-            response = 'Done'
+            response = 'Done: ' + str(layer)
 
         else:
 
