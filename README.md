@@ -6,6 +6,13 @@ for viewing and plotting them.
 
 ## Installation
 
+### Install dependencies
+
+```
+pip install flask
+pip install python-dotenv
+```
+
 ### Copy .env.example to .env
 
 Customize your values
