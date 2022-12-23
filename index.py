@@ -100,7 +100,20 @@ def status():
         # for x in range(len(axidraw_list)):
             # print(axidraw_list[x])
 
-        return "on"
+        # Check Power
+        # Open serial port to AxiDraw;
+        ad.interactive()
+        if ad.connect():
+
+            # Query current, voltage
+            raw_string = ad.usb_query('QC\r')
+            ad.disconnect()
+
+            # Parse
+            split_string = raw_string.split(",", 1)
+            voltage_value = int(split_string[1])
+            if voltage_value >= 250:
+                return "on"
 
     return "off"
 
