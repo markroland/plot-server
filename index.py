@@ -82,5 +82,12 @@ def plot(file):
 
     return response
 
+# Set up cross origin resource sharing
+# @app.after_request
+# def after_request(response):
+#     response.headers.add('Access-Control-Allow-Origin', 'http://project.markroland.com')
+#     response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT')
+#     return response
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=os.environ.get("HOST_PORT"))
