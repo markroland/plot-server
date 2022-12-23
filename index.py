@@ -82,6 +82,28 @@ def plot(file):
 
     return response
 
+@app.route('/status')
+def status():
+
+    # See https://axidraw.com/doc/py_api/#list_names
+    # Note: This indicates USB connection and NOT power on
+    ad.plot_setup()
+    ad.options.mode = "manual"
+    ad.options.manual_cmd = "list_names"
+    out = ad.plot_run()
+    axidraw_list = ad.name_list
+
+    #print(type(axidraw_list))
+    if axidraw_list is not None:
+
+        # For future: Print device names
+        # for x in range(len(axidraw_list)):
+            # print(axidraw_list[x])
+
+        return "on"
+
+    return "off"
+
 # Set up cross origin resource sharing
 # @app.after_request
 # def after_request(response):
