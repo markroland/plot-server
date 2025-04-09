@@ -23,9 +23,15 @@
     <div class="plotter">
         <form name="plot" action="">
             <label for="layer">Select Layer(s)</label>
-            <select name="layer"></select>
+            <select id="layer" name="layer"></select>
             <input type="hidden" name="filename" value="" />
-            <button id="submit_plot" type="submit">Plot</button>
+            <button id="submit_plot" type="submit" disabled>Plot</button>
+        </form>
+        <hr />
+        <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data">
+            <label for="file">Upload SVG File</label>
+            <input type="file" id="file" name="file" accept=".svg" required>
+            <button id="upload_plot" type="submit" disabled>Plot</button>
         </form>
     </div>
 
@@ -43,6 +49,23 @@
     </p>
 
     <script>
+
+        // Check plotter status
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/status');
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                if (xhr.responseText == "on") {
+                    console.log("Plotter is ready");
+                    document.querySelector("#submit_plot").disabled = false;
+                    document.querySelector("#upload_plot").disabled = false;
+                }
+
+            } else {
+                console.log("Error: " + xhr.status);
+            }
+        };
+        xhr.send();
 
         // Add event handler to each file link
         document.querySelectorAll("#files a").forEach(item => {
@@ -165,6 +188,29 @@
             };
             xhr.send();
         }
+
+        // Add event handler to Plot button
+        document.querySelector('form[name=upload-plot]').addEventListener("submit", function(event){
+
+            event.preventDefault();
+
+            document.querySelector("#upload_plot").disabled = true;
+
+            let request = '/plot/upload';
+            if (layer != null) {
+                request += "?layer=" + layer;
+            }
+            var xhr = new XMLHttpRequest();
+            var formData = new FormData(this);
+            xhr.open('POST', '/plot/upload');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    console.log(xhr.responseText);
+                    document.querySelector("#upload_plot").disabled = false;
+                }
+            };
+            xhr.send(formData);
+        });
 
     </script>
 

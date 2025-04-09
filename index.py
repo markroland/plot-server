@@ -24,6 +24,12 @@ ad = axidraw.AxiDraw()
 # Create new Flask app
 app = Flask(__name__)
 
+# Get the directory of the current script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Example: Define the upload folder relative to the script
+app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
+
 # Define route: Default
 @app.route('/')
 def index():
@@ -59,7 +65,7 @@ def plot(filepath, layer=0):
     ad.plot_run()
 
 # Define route for a plot request
-@app.route('/plot/<file>', methods=['GET'])
+@app.route('/plot/<file>', methods=['GET', 'POST'])
 def plot_request(file):
 
     if request.method == 'GET':
@@ -91,7 +97,33 @@ def plot_request(file):
 
             response = 'Busy', 503
 
-    return response
+        return response
+
+    if request.method == 'POST':
+
+        if 'file' not in request.files:
+            return 'No file part', 400
+
+        # plot an uploaded file
+        uploaded_file = request.files.get('file')
+
+        if uploaded_file.filename == '':
+            return 'No selected file', 400
+
+        # Save the uploaded file relative to the script
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], uploaded_file.filename)
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        uploaded_file.save(filepath)
+
+        # Plot the uploaded file
+        if sem.acquire(True, 0.1):
+            layer = request.args.get("layer", default=0, type=int)
+            plot(filepath, layer)
+            # os.remove(filepath)
+            sem.release()
+            return f'Done: {layer}', 200
+        else:
+            return 'Busy', 503
 
 @app.route('/status')
 def status():
