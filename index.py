@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 #
 # AxiDraw Plot Server
+# This is designed to be connected to a single plotter
 #
 # Run in background even after a hang up:
 #  nohup python index.py > /dev/null 2>&1 &
@@ -8,7 +9,8 @@
 from dotenv import load_dotenv
 import threading
 from pyaxidraw import axidraw
-from flask import Flask, request, render_template
+from flask import Flask, request, Response, render_template
+from flask_cors import CORS
 import os
 
 # Load settings from environment
@@ -23,6 +25,9 @@ ad = axidraw.AxiDraw()
 
 # Create new Flask app
 app = Flask(__name__)
+
+# Enable CORS
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Get the directory of the current script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -128,6 +133,9 @@ def plot_request(file):
 @app.route('/status')
 def status():
 
+    # Default to "Off"
+    status_text = "off"
+
     # See https://axidraw.com/doc/py_api/#list_names
     # Note: This indicates USB connection and NOT power on
     ad.plot_setup()
@@ -162,9 +170,16 @@ def status():
             split_string = raw_string.split(",", 1)
             voltage_value = int(split_string[1])
             if voltage_value >= 250:
-                return "on"
+                status_text = "on"
 
-    return "off"
+    response = Response(status_text, mimetype='text/plain')
+
+    # Set headers to prevent caching
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, public, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+
+    return response
 
 # Set up cross origin resource sharing
 # @app.after_request
