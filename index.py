@@ -33,9 +33,34 @@ def index():
 
     return render_template('index.html', files=plot_files)
 
+def plot(filepath, layer=0):
+    # Load file & configure plot context
+    ad.plot_setup(filepath)
+    ad.options.mode = "plot"
+
+    # Set configuration (Not working)
+    # config_path = os.environ.get("AXIDRAW_CONFIG")
+    # ad.load_config(config_path)
+    # if os.path.exists(config_path):
+    #     ad.load_config(config_path)
+    # else:
+    #     print(f"Configuration File Not Found: {config_path}")
+
+    if layer > 0:
+        ad.options.mode = "layers"
+        ad.options.layer = layer
+
+    # Plot the file
+    ad.plot_run()
+
+    # Turn off motors
+    ad.options.mode = "manual"
+    ad.options.manual_cmd = "disable_xy"
+    ad.plot_run()
+
 # Define route for a plot request
 @app.route('/plot/<file>', methods=['GET'])
-def plot(file):
+def plot_request(file):
 
     if request.method == 'GET':
 
@@ -55,21 +80,7 @@ def plot(file):
             # Determine requested layer
             layer = request.args.get("layer", default=0, type=int)
 
-            # Load file & configure plot context
-            ad.plot_setup(filepath)
-            ad.options.mode = "plot"
-
-            if layer > 0:
-                ad.options.mode = "layers"
-                ad.options.layer = layer
-
-            # Plot the file
-            ad.plot_run()
-
-            # Turn off motors
-            ad.options.mode = "manual"
-            ad.options.manual_cmd = "disable_xy"
-            ad.plot_run()
+            plot(filepath, layer)
 
             # Release the Semaphore
             sem.release()
