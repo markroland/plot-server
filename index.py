@@ -45,11 +45,31 @@ def index():
     return render_template('index.html', files=plot_files)
 
 def plot(filepath, layer=0):
+
     # Load file & configure plot context
     ad.plot_setup(filepath)
     ad.options.mode = "plot"
+    ad.options.model = int(os.environ.get("AXIDRAW_MODEL", "4"))
+    ad.options.auto_rotate = False
+    ad.options.reordering = 0
+    ad.options.check_limits = True
+    ad.options.clip_to_page = True
+    # speed_pendown
+    # speed_penup
+    # accel
+    # pen_pos_down
+    # pen_pos_up
+    # pen_rate_lower
+    # pen_rate_raise
+    # pen_delay_down
+    # pen_delay_up
+    # const_speed
+    # model
+    # port
+    # port_config
 
     # Set configuration (Not working)
+    # config_path = os.environ.get("AXIDRAW_CONFIG")
     # config_path = os.environ.get("AXIDRAW_CONFIG")
     # ad.load_config(config_path)
     # if os.path.exists(config_path):
@@ -60,6 +80,8 @@ def plot(filepath, layer=0):
     if layer > 0:
         ad.options.mode = "layers"
         ad.options.layer = layer
+
+    # TODO: Protect against going outside of plotter's bounds
 
     # Plot the file
     ad.plot_run()
