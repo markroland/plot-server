@@ -107,6 +107,12 @@ def status():
 
             # Query current, voltage
             raw_string = ad.usb_query('QC\r')
+
+            # Disable xy
+            ad.options.mode = "manual"
+            ad.options.manual_cmd = "disable_xy"
+            ad.plot_run()
+
             ad.disconnect()
 
             # Parse
