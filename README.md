@@ -6,11 +6,18 @@ for viewing and plotting them.
 
 ## Installation
 
+**Create a Virtual Environment with `venv`**
+
+```
+python -m venv .venv
+```
+
 ### Install dependencies
 
 ```
-pip install flask
-pip install python-dotenv
+source .venv/bin/activate
+python -m pip install https://cdn.evilmadscientist.com/dl/ad/public/AxiDraw_API.zip
+pip install -r requirements.txt
 ```
 
 ### Copy .env.example to .env
@@ -33,7 +40,11 @@ See instructions on [AxiDraw.com](https://axidraw.com/doc/py_api).
 ## Run
 
 ```
+source .venv/bin/activate
+
 python index.py
+
+deactivate
 ```
 
 Run in the background:
