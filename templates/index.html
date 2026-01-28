@@ -17,10 +17,28 @@
 <body>
     <div class="artwork">
         <object id="svg-object" data="" type="image/svg+xml"></object>
+        <div class="svg-info">
+            <p><strong>SVG Dimensions:</strong> <span id="svg-dimensions">-</span></p>
+            <p><strong>Plotter Fit:</strong> <span id="plotter-fit">-</span></p>
+        </div>
         <!-- <img src="/static/sketches/radial-lines-1.svg" alt="" /> -->
     </div>
 
     <div class="plotter">
+        <div class="plotter-status">
+            <h3>Plotter Status</h3>
+            <div id="status-info">
+                <p><strong>Machine:</strong> <span id="plotter-machine">Unknown</span></p>
+                <p><strong>Status:</strong> <span id="plotter-status">Checking...</span></p>
+                <div id="plotter-config" style="display: none;">
+                    <details>
+                        <summary>Configuration Details</summary>
+                        <div id="config-details"></div>
+                    </details>
+                </div>
+            </div>
+        </div>
+        <hr />
         <form name="plot" action="">
             <label for="layer">Select Layer(s)</label>
             <select id="layer" name="layer"></select>
@@ -50,22 +68,176 @@
 
     <script>
 
-        // Check plotter status
+        // Global variables to store plotter and SVG data
+        let currentPlotterData = null;
+        let currentSvgDimensions = null;
+
+        // Check plotter status with detailed information
         var xhr = new XMLHttpRequest();
-        xhr.open('GET', '/status');
+        xhr.open('GET', '/status.json');
         xhr.onload = function() {
             if (xhr.status === 200) {
-                if (xhr.responseText == "on") {
+                let plotterData = JSON.parse(xhr.responseText);
+                console.log("Plotter data:", plotterData);
+
+                // Update status display
+                updatePlotterStatus(plotterData);
+
+                // Enable plot buttons if plotter is ready
+                if (plotterData.status === "on") {
                     console.log("Plotter is ready");
                     document.querySelector("#submit_plot").disabled = false;
                     document.querySelector("#upload_plot").disabled = false;
+                } else {
+                    console.log("Plotter status:", plotterData.status);
                 }
-
             } else {
                 console.log("Error: " + xhr.status);
+                document.querySelector("#plotter-status").textContent = "Error";
             }
         };
         xhr.send();
+
+        // Function to update plotter status display
+        function updatePlotterStatus(data) {
+            // Store plotter data globally
+            currentPlotterData = data;
+
+            // Basic status - simple on/off display
+            document.querySelector("#plotter-status").textContent = data.status;
+
+            // Machine information
+            document.querySelector("#plotter-machine").textContent = data.machine;
+
+            // Configuration information
+            if (data.config && Object.keys(data.config).length > 0) {
+                document.querySelector("#plotter-config").style.display = "block";
+
+                // Detailed configuration
+                let configDetails = document.querySelector("#config-details");
+                configDetails.innerHTML = '';
+
+                // Travel dimensions (now in config details)
+                if (data.config.x_travel && data.config.y_travel) {
+                    let travel = `${data.config.x_travel}mm × ${data.config.y_travel}mm`;
+                    let p = document.createElement('p');
+                    p.innerHTML = `<strong>Travel Area:</strong> ${travel}`;
+                    configDetails.appendChild(p);
+                }
+
+                // Pen speeds (now in config details)
+                if (data.config.speed_pendown && data.config.speed_penup) {
+                    let speeds = `Down: ${data.config.speed_pendown}%, Up: ${data.config.speed_penup}%`;
+                    let p = document.createElement('p');
+                    p.innerHTML = `<strong>Pen Speed:</strong> ${speeds}`;
+                    configDetails.appendChild(p);
+                }
+
+                // Create a formatted display of other config values
+                Object.entries(data.config).forEach(([key, value]) => {
+                    if (key !== 'x_travel' && key !== 'y_travel' && key !== 'speed_pendown' && key !== 'speed_penup' && typeof value !== 'object') {
+                        let p = document.createElement('p');
+                        p.innerHTML = `<strong>${key}:</strong> ${value}`;
+                        configDetails.appendChild(p);
+                    }
+                });
+
+                if (data.config.config_file) {
+                    let p = document.createElement('p');
+                    p.innerHTML = `<strong>Config File:</strong> ${data.config.config_file}`;
+                    p.style.fontSize = '0.9em';
+                    p.style.color = '#666';
+                    configDetails.appendChild(p);
+                }
+            }
+
+            // Check SVG fit if we have SVG dimensions
+            checkSvgFit();
+        }
+
+        // Function to extract SVG dimensions
+        function extractSvgDimensions(svgDocument) {
+            const svgElement = svgDocument.querySelector('svg');
+            if (!svgElement) return null;
+
+            let width, height;
+
+            // Try to get dimensions from viewBox first
+            const viewBox = svgElement.getAttribute('viewBox');
+            if (viewBox) {
+                const [x, y, w, h] = viewBox.split(' ').map(parseFloat);
+                // ViewBox dimensions are in SVG user units (pixels at 96 DPI)
+                width = w * (25.4 / 96); // Convert to mm
+                height = h * (25.4 / 96);
+            } else {
+                // Fall back to width/height attributes
+                const widthAttr = svgElement.getAttribute('width');
+                const heightAttr = svgElement.getAttribute('height');
+
+                if (widthAttr && heightAttr) {
+                    // Remove units and convert to numbers
+                    width = parseFloat(widthAttr.replace(/[^\d.]/g, ''));
+                    height = parseFloat(heightAttr.replace(/[^\d.]/g, ''));
+
+                    // Convert from other units to mm if needed
+                    // SVG uses 96 DPI standard (1 inch = 96 pixels, 1 inch = 25.4 mm)
+                    if (widthAttr.includes('px') || !isNaN(parseFloat(widthAttr))) {
+                        width = width * (25.4 / 96); // Convert px to mm at 96 DPI
+                        height = height * (25.4 / 96);
+                    } else if (widthAttr.includes('in')) {
+                        width = width * 25.4; // Convert inches to mm
+                        height = height * 25.4;
+                    }
+                    // Assume mm if no conversion needed
+                }
+            }
+
+            return width && height ? { width, height } : null;
+        }
+
+        // Function to check if SVG fits within plotter bounds
+        function checkSvgFit() {
+            if (!currentSvgDimensions || !currentPlotterData?.config?.x_travel || !currentPlotterData?.config?.y_travel) {
+                document.querySelector("#plotter-fit").textContent = "-";
+                return;
+            }
+
+            const svgWidth = currentSvgDimensions.width;
+            const svgHeight = currentSvgDimensions.height;
+            // Convert plotter travel dimensions from inches to mm (1 inch = 25.4 mm)
+            const plotterWidth = currentPlotterData.config.x_travel * 25.4;
+            const plotterHeight = currentPlotterData.config.y_travel * 25.4;
+
+            const fitsWidth = svgWidth <= plotterWidth;
+            const fitsHeight = svgHeight <= plotterHeight;
+            const fits = fitsWidth && fitsHeight;
+
+            let fitText = "";
+            let fitClass = "";
+
+            if (fits) {
+                fitText = "✓ Fits";
+                fitClass = "fit-good";
+            } else {
+                const issues = [];
+                if (!fitsWidth) issues.push(`width: ${svgWidth.toFixed(1)}mm > ${plotterWidth}mm`);
+                if (!fitsHeight) issues.push(`height: ${svgHeight.toFixed(1)}mm > ${plotterHeight}mm`);
+                fitText = `✗ Too large (${issues.join(', ')})`;
+                fitClass = "fit-bad";
+            }
+
+            const fitElement = document.querySelector("#plotter-fit");
+            fitElement.textContent = fitText;
+            fitElement.className = fitClass;
+
+            // Disable plot button if SVG doesn't fit, but only enable if plotter is also ready
+            const plotButton = document.querySelector("#submit_plot");
+            if (!fits) {
+                plotButton.disabled = true;
+            } else if (currentPlotterData && currentPlotterData.status === "on") {
+                plotButton.disabled = false;
+            }
+        }
 
         // Add event handler to each file link
         document.querySelectorAll("#files a").forEach(item => {
@@ -101,6 +273,21 @@
 
             // Load SVG content
             var svgObject = document.getElementById('svg-object').contentDocument;
+
+            // Extract and display SVG dimensions
+            const dimensions = extractSvgDimensions(svgObject);
+            if (dimensions) {
+                currentSvgDimensions = dimensions;
+                document.querySelector("#svg-dimensions").textContent =
+                    `${dimensions.width.toFixed(1)}mm × ${dimensions.height.toFixed(1)}mm`;
+
+                // Check if it fits the plotter
+                checkSvgFit();
+            } else {
+                currentSvgDimensions = null;
+                document.querySelector("#svg-dimensions").textContent = "Unable to determine";
+                document.querySelector("#plotter-fit").textContent = "-";
+            }
 
             // var parser = new DOMParser();
             // var doc = parser.parseFromString(svgObject, "image/svg+xml");

@@ -51,6 +51,34 @@ div.artwork {
   margin-bottom: 1em;
 }
 
+.svg-info {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 0.5em;
+  padding: 0.75em;
+  margin-top: 1em;
+  text-align: left;
+  font-size: 0.9em;
+}
+
+.svg-info p {
+  margin: 0.5em 0;
+}
+
+.svg-info strong {
+  color: #555;
+}
+
+.fit-good {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.fit-bad {
+  color: #c62828;
+  font-weight: bold;
+}
+
 div.file_list {
   background-color: #fff;
   padding:  1em;
@@ -77,6 +105,52 @@ div.plotter {
   width:  576px;
   margin:  0 auto;
   text-align: center;
+}
+
+.plotter-status {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 0.5em;
+  padding: 1em;
+  margin-bottom: 1em;
+  text-align: left;
+}
+
+.plotter-status h3 {
+  margin: 0 0 1em 0;
+  color: #333;
+  text-align: center;
+}
+
+.plotter-status p {
+  margin: 0.5em 0;
+  font-size: 0.95em;
+}
+
+.plotter-status strong {
+  color: #555;
+}
+
+#plotter-status {
+  font-weight: bold;
+}
+
+#plotter-config details {
+  margin-top: 1em;
+  padding: 0.5em;
+  background-color: #f9f9f9;
+  border-radius: 0.25em;
+}
+
+#plotter-config summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0.25em;
+}
+
+#config-details p {
+  font-size: 0.85em;
+  margin: 0.25em 0;
 }
 
 #filename {
