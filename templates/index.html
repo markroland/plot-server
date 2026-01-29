@@ -68,6 +68,8 @@
     </p>
 
     <script>
+    // Polling interval ID
+    let busyPollingInterval = null;
 
         // Global variables to store plotter and SVG data
         let currentPlotterData = null;
@@ -104,8 +106,46 @@
             // Store plotter data globally
             currentPlotterData = data;
 
-            // Basic status - simple on/off display
-            document.querySelector("#plotter-status").textContent = data.status;
+            // Show status with color coding
+            const statusElem = document.querySelector("#plotter-status");
+            let statusText = data.status;
+            let color = "black";
+            if (data.status === 'busy') {
+                statusText = 'Busy';
+                color = '#ff851b'; // orange
+                // Start polling if not already polling
+                if (!busyPollingInterval) {
+                    busyPollingInterval = setInterval(() => {
+                        fetch('/status.json')
+                            .then(res => res.json())
+                            .then(newStatus => {
+                                if (newStatus.status !== 'busy') {
+                                    clearInterval(busyPollingInterval);
+                                    busyPollingInterval = null;
+                                }
+                                updatePlotterStatus(newStatus);
+                            });
+                    }, 5000);
+                }
+            } else if (data.status === 'on') {
+                statusText = 'On';
+                color = '#2ecc40'; // green
+                // Stop polling if plotter is ready
+                if (busyPollingInterval) {
+                    clearInterval(busyPollingInterval);
+                    busyPollingInterval = null;
+                }
+            } else if (data.status === 'off') {
+                statusText = 'Off';
+                color = '#ff4136'; // red
+                // Stop polling if plotter is off
+                if (busyPollingInterval) {
+                    clearInterval(busyPollingInterval);
+                    busyPollingInterval = null;
+                }
+            }
+            statusElem.textContent = statusText;
+            statusElem.style.color = color;
 
             // Machine information
             document.querySelector("#plotter-machine").textContent = data.machine;

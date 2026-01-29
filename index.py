@@ -104,12 +104,17 @@ def load_axidraw_config(config_path):
         print(f"Error loading config from {config_path}: {e}")
         return {}
 
+
 # Set up a Semaphore object for use with blocking plot
 # requests while the plotter is busy
 sem = threading.Semaphore()
 
 # Create an AxiDraw class instance
 ad = axidraw.AxiDraw()
+
+# Cache device info by USB identifier
+device_cache = {}
+last_usb_id = None
 
 # Create new Flask app
 app = Flask(__name__)
@@ -215,21 +220,18 @@ def plot_request(file):
         # If the file is found, acquire a Semaphore to block
         # other incoming requests until the plotter is done
         if sem.acquire(True, 0.1):
-
-            # Determine requested layer
-            layer = request.args.get("layer", default=0, type=int)
-
-            plot(filepath, layer)
-
-            # Release the Semaphore
-            sem.release()
-
-            response = 'Done: ' + str(layer)
-
+            try:
+                # Determine requested layer
+                layer = request.args.get("layer", default=0, type=int)
+                plot(filepath, layer)
+                response = 'Done: ' + str(layer)
+            except Exception as e:
+                print(f"[ERROR] Exception during plot: {e}")
+                response = f'Error: {e}', 500
+            finally:
+                sem.release()
         else:
-
             response = 'Busy', 503
-
         return response
 
     if request.method == 'POST':
@@ -250,16 +252,30 @@ def plot_request(file):
 
         # Plot the uploaded file
         if sem.acquire(True, 0.1):
-            layer = request.args.get("layer", default=0, type=int)
-            plot(filepath, layer)
-            # os.remove(filepath)
-            sem.release()
-            return f'Done: {layer}', 200
+            try:
+                layer = request.args.get("layer", default=0, type=int)
+                plot(filepath, layer)
+                # os.remove(filepath)
+                return f'Done: {layer}', 200
+            except Exception as e:
+                print(f"[ERROR] Exception during plot: {e}")
+                return f'Error: {e}', 500
+            finally:
+                sem.release()
         else:
             return 'Busy', 503
 
+last_known_status = {
+    "status": "off",
+    "machine": "none",
+    "device_info": "none",
+    "model_number": None,
+    "config": {}
+}
+
 def get_plotter_status():
     """Helper function to get plotter status and machine type"""
+    global last_known_status, device_cache, last_usb_id
     # Default response
     status_data = {
         "status": "off",
@@ -269,8 +285,27 @@ def get_plotter_status():
         "config": {}
     }
 
-    # See https://axidraw.com/doc/cli_api/#list_names
-    # Note: This indicates USB connection and NOT power on
+    # If the plotter is busy (semaphore locked), do not send hardware commands
+    if not sem.acquire(blocking=False):
+        # Use cached info if available
+        status_data = last_known_status.copy()
+        status_data["status"] = "busy"
+        return status_data
+    else:
+        sem.release()
+
+    # Try to get USB id from last cache
+    usb_id = None
+    if last_usb_id and last_usb_id in device_cache:
+        usb_id = last_usb_id
+        cached = device_cache[usb_id]
+        # Check if device is still present by scanning USB devices (non-intrusive)
+        # For now, just use cached info if present
+        status_data = cached.copy()
+        status_data["status"] = cached.get("status", "on")
+        return status_data
+
+    # Otherwise, query the hardware (first time or USB id changed)
     ad.plot_setup()
     ad.options.mode = "manual"
     ad.options.manual_cmd = "list_names"
@@ -286,8 +321,9 @@ def get_plotter_status():
         # Get first connected device
         device_identifier = axidraw_list[0]
         print(f"Debug - device_identifier: '{device_identifier}'")
-
         status_data["device_info"] = device_identifier
+        # Save USB id for future status checks
+        last_usb_id = device_identifier
 
         # Determine machine type based on device identifier
         # This can be either a USB nickname or a port path
@@ -407,6 +443,12 @@ def get_plotter_status():
             ad.plot_run()
 
             ad.disconnect()
+
+    # Cache the latest known status for use when busy
+    last_known_status = status_data.copy()
+    # Cache by USB id for non-intrusive status
+    if last_usb_id:
+        device_cache[last_usb_id] = status_data.copy()
 
     return status_data
 
