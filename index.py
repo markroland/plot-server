@@ -127,8 +127,15 @@ app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 @app.route('/')
 def index():
 
-    # Get files
-    plot_files = os.listdir(os.environ.get("ART_DIRECTORY"));
+    # Recursively get all .svg files in art_dir and subdirectories
+    art_dir = os.environ.get("ART_DIRECTORY")
+    plot_files = []
+    for root, dirs, files in os.walk(art_dir):
+        for f in files:
+            if f.lower().endswith('.svg'):
+                # Store relative path from art_dir
+                rel_path = os.path.relpath(os.path.join(root, f), art_dir)
+                plot_files.append(rel_path)
 
     return render_template('index.html', files=plot_files)
 
