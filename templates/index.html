@@ -15,13 +15,14 @@
     <meta name="theme-color" content="#ffffff">
 </head>
 <body>
+
     <div class="artwork">
         <object id="svg-object" data="" type="image/svg+xml"></object>
-        <div class="svg-info">
-            <p><strong>SVG Dimensions:</strong> <span id="svg-dimensions">-</span></p>
-            <p><strong>Plotter Fit:</strong> <span id="plotter-fit">-</span></p>
-        </div>
         <!-- <img src="/static/sketches/radial-lines-1.svg" alt="" /> -->
+    </div>
+    <div class="svg-info">
+        <p><strong>SVG Dimensions:</strong> <span id="svg-dimensions">-</span></p>
+        <p><strong>Plotter Fit:</strong> <span id="plotter-fit">-</span></p>
     </div>
 
     <div class="plotter">
@@ -220,8 +221,8 @@
                 fitClass = "fit-good";
             } else {
                 const issues = [];
-                if (!fitsWidth) issues.push(`width: ${svgWidth.toFixed(1)}mm > ${plotterWidth}mm`);
-                if (!fitsHeight) issues.push(`height: ${svgHeight.toFixed(1)}mm > ${plotterHeight}mm`);
+                if (!fitsWidth) issues.push(`width: ${svgWidth.toFixed(1)}mm > ${plotterWidth.toFixed(1)}mm`);
+                if (!fitsHeight) issues.push(`height: ${svgHeight.toFixed(1)}mm > ${plotterHeight.toFixed(1)}mm`);
                 fitText = `✗ Too large (${issues.join(', ')})`;
                 fitClass = "fit-bad";
             }
@@ -240,30 +241,43 @@
         }
 
         // Add event handler to each file link
+        // Helper to animate .artwork height after SVG loads
+        function animateArtworkHeightOnSVGChange(filepath, filename) {
+            const svgObject = document.querySelector('#svg-object');
+            // Remove previous load handler
+            svgObject.onload = null;
+            // Change SVG only if different, else force reload by changing to dummy and back
+            let forceReload = false;
+            if (svgObject.getAttribute('data-filename') === filename) {
+                forceReload = true;
+            }
+            function setSVG() {
+                svgObject.setAttribute('data', filepath);
+                svgObject.setAttribute('data-filename', filename);
+            }
+            if (forceReload) {
+                svgObject.setAttribute('data', 'about:blank');
+                setTimeout(setSVG, 10);
+            } else {
+                setSVG();
+            }
+        }
+
         document.querySelectorAll("#files a").forEach(item => {
             item.addEventListener("click", function(event){
-
                 // Clear any "selected" list items
                 document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
-
                 // Apply class to highlight clicked item
                 event.target.parentElement.classList.add('selected');
-
                 // Parse file request
                 let filepath = this.getAttribute("href");
                 let filename = this.getAttribute("data-filename");
-
-                // Insert an image request
-                // document.querySelector("div.artwork").innerHTML =  '<div id="filename"><p>' + filename + '</p></div>'
-                //     + '<img src="' + filepath + '" alt="" />';
-                document.querySelector("#svg-object").setAttribute("data", filepath);
-
-                // Set a data attribute for just the filename
-                // This is only to avoid parsing the full request path later
-                document.querySelector("#svg-object").setAttribute("data-filename", filename);
-                // document.querySelector("#submit_plot").setAttribute("value", filename);
-
-                // Stop link from loading a page request
+                // Update the URL with ?sketch={sketchname} (no reload)
+                const url = new URL(window.location);
+                url.searchParams.set('sketch', filename);
+                window.history.replaceState({}, '', url);
+                // Animate .artwork height after SVG loads
+                animateArtworkHeightOnSVGChange(filepath, filename);
                 event.preventDefault();
             })
         });
@@ -351,13 +365,33 @@
             event.preventDefault();
         });
 
-        // Load the first sketch from the list on page load
+        // On page load, check for ?sketch= param and load that sketch, else load the first
         window.addEventListener("load", function() {
-            let first_sketch = document.querySelector('ol#files li a');
-            let filename = first_sketch.getAttribute('data-filename');
-            let filepath = "/static/sketches/" + filename;
-            document.querySelector("#svg-object").setAttribute("data", filepath);
-            document.querySelector("#svg-object").setAttribute("data-filename", filename);
+            const urlParams = new URLSearchParams(window.location.search);
+            let sketchParam = urlParams.get('sketch');
+            let found = false;
+            if (sketchParam) {
+                // Try to find the matching sketch in the list
+                let sketchLink = Array.from(document.querySelectorAll('ol#files li a')).find(a => a.getAttribute('data-filename') === sketchParam);
+                if (sketchLink) {
+                    let filename = sketchLink.getAttribute('data-filename');
+                    let filepath = "/static/sketches/" + filename;
+                    animateArtworkHeightOnSVGChange(filepath, filename);
+                    // Highlight the selected item
+                    sketchLink.parentElement.classList.add('selected');
+                    found = true;
+                }
+            }
+            if (!found) {
+                // Fallback: load the first sketch
+                let first_sketch = document.querySelector('ol#files li a');
+                if (first_sketch) {
+                    let filename = first_sketch.getAttribute('data-filename');
+                    let filepath = "/static/sketches/" + filename;
+                    animateArtworkHeightOnSVGChange(filepath, filename);
+                    first_sketch.parentElement.classList.add('selected');
+                }
+            }
         });
 
         // Send an API request to start a plot
