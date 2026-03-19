@@ -15,113 +15,162 @@
     <meta name="theme-color" content="#ffffff">
 </head>
 <body>
-
-    <div class="artwork">
-        <object id="svg-object" data="" type="image/svg+xml"></object>
-    </div>
-    <div class="svg-info">
-        <p><strong>SVG Dimensions:</strong> <span id="svg-dimensions">-</span></p>
-        <p><strong>Plotter Fit:</strong> <span id="plotter-fit">-</span></p>
-    </div>
-
-    <div class="plotter">
-        <div class="plotter-status">
-            <h3>Plotter Status</h3>
-            <div id="status-info">
-                <p><strong>Machine:</strong> <span id="plotter-machine">Unknown</span></p>
-                <p><strong>Status:</strong> <span id="plotter-status">Checking...</span></p>
-                <div id="plotter-config" style="display: none;">
-                    <details>
-                        <summary>Configuration Details</summary>
-                        <div id="config-details"></div>
-                    </details>
+    <div class="app-shell">
+        <header class="app-header">
+            <div>
+                <h1>Plot Server</h1>
+            </div>
+            <div class="header-status" aria-label="Plotter summary">
+                <div class="status-chip">
+                    <span class="status-chip__label">Machine</span>
+                    <strong id="plotter-machine-chip">Unknown</strong>
+                </div>
+                <div class="status-chip">
+                    <span class="status-chip__label">Status</span>
+                    <strong id="plotter-status-chip">Checking...</strong>
                 </div>
             </div>
-        </div>
-        <hr />
-        <form name="plot" action="">
-            <label for="layer">Select Layer(s)</label>
-            <select id="layer" name="layer"></select>
+        </header>
 
-            <br />
+        <main class="workspace">
+            <aside class="library-rail">
+                <section class="card upload-card">
+                    <div class="panel-heading compact">
+                        <div>
+                            <p class="eyebrow">Library</p>
+                            <h2>Upload artwork</h2>
+                        </div>
+                    </div>
+                    <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data" class="upload-form upload-form--stacked">
+                        <label for="file" class="upload-label">Upload SVG</label>
+                        <input type="file" id="file" name="file" accept=".svg" required>
+                        <button id="upload_plot" type="submit">Upload</button>
+                    </form>
+                </section>
 
-            <label for="title">Title</label>
-            <input type="text" id="title" name="title" placeholder="Artwork Title">
+                <section class="library-list card">
+                    <div class="panel-heading compact">
+                        <div>
+                            <p class="eyebrow">Sketch library</p>
+                            <h2>Files</h2>
+                        </div>
+                    </div>
 
-            <br />
+                    <div class="library-toolbar">
+                        <label class="search-field" for="library-search">
+                            <span>Search</span>
+                            <input type="search" id="library-search" placeholder="Filter sketches by filename">
+                        </label>
+                    </div>
 
-            <label for="tool">Tool</label>
-            <select id="tool" name="tool">
-                <option value="Green Brush Pen">Green Brush Pen</option>
-                <option value="Lamy Safari Blue">Lamy Safari Blue</option>
-                <option value="Micron 01 black">Micron 01 black</option>
-                <option value="Micron 01 Black">Micron 01 Black</option>
-                <option value="Papermate Flair Fine">Papermate Flair Fine</option>
-                <option value="Papermate Flair Medium" selected>Papermate Flair Medium</option>
-                <option value="Pilot Precise v5 Extra Fine Black">Pilot Precise v5 Extra Fine Black</option>
-                <option value="Rotrin Isograph 0.5 Black">Rotrin Isograph 0.5 Black</option>
-                <option value="Rotring Isograph 0.1">Rotring Isograph 0.1</option>
-                <option value="Rotring Isograph 0.2">Rotring Isograph 0.2</option>
-                <option value="Rotring Isograph 0.3">Rotring Isograph 0.3</option>
-                <option value="Rotring Isograph 0.4">Rotring Isograph 0.4</option>
-                <option value="Rotring Isograph 0.5">Rotring Isograph 0.5</option>
-                <option value="Rotring Isograph 0.5mm with Rotring Ink">Rotring Isograph 0.5mm with Rotring Ink</option>
-                <option value="Sharpie Fine Point Black">Sharpie Fine Point Black</option>
-                <option value="Sharpie Fine Point">Sharpie Fine Point</option>
-                <option value="Stabilo Fine">Stabilo Fine</option>
-                <option value="Stabilo Fineliner">Stabilo Fineliner</option>
-                <option value="Stabilo point 88 fine 0,4 magenta">Stabilo point 88 fine 0,4 magenta</option>
-                <option value="Stabilo point 88 fine 0,4 yellow">Stabilo point 88 fine 0,4 yellow</option>
-                <option value="Stabilo Yellow">Stabilo Yellow</option>
-                <option value="Staedtler pigment liner 1.2">Staedtler pigment liner 1.2</option>
-                <option value="Tul Gel Pen Bold Black">Tul Gel Pen Bold Black</option>
-            </select>
+                    <div class="file_list">
+                        <ol id="files">
+                        {% for f in files %}
+                            <li><a href="/static/uploads/{{f}}" data-filename="{{f}}">{{f}}</a></li>
+                        {% endfor %}
+                        </ol>
+                    </div>
+                </section>
+            </aside>
 
-            <br />
+            <section class="preview-panel card">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">Artwork preview</p>
+                        <h2 id="selected-sketch-name">No sketch selected</h2>
+                    </div>
+                </div>
 
-            <label for="material">Material</label>
-            <select id="material" name="material">
-                <option value="A6 Invitation Envelope 100 GSM">A6 Invitation Envelope 100 GSM</option>
-                <option value="Index Card">Index Card</option>
-                <option value="Paper: Arches Watercolor Cold Pressed Cotton 140lb">Paper: Arches Watercolor Cold Pressed Cotton 140lb</option>
-                <option value="Paper: Canson Mixed Media" selected>Paper: Canson Mixed Media</option>
-                <option value="Paper: Printer Paper">Paper: Printer Paper</option>
-                <option value="Paper: Strathmore Bristol smooth 100lb">Paper: Strathmore Bristol smooth 100lb</option>
-                <option value="Printer Paper">Printer Paper</option>
-                <option value="Strathmore Bristol smooth 100lb">Strathmore Bristol smooth 100lb</option>
-            </select>
+                <div class="artwork-frame">
+                    <div class="artwork">
+                        <object id="svg-object" data="" type="image/svg+xml"></object>
+                    </div>
+                </div>
 
-            <input type="hidden" name="filename" value="" />
-            <button id="submit_plot" type="submit" disabled>Plot</button>
-        </form>
+                <div class="svg-info-grid">
+                    <div class="info-tile">
+                        <span class="info-tile__label">SVG Dimensions</span>
+                        <strong id="svg-dimensions">-</strong>
+                    </div>
+                    <div class="info-tile">
+                        <span class="info-tile__label">Plotter Fit</span>
+                        <strong id="plotter-fit">-</strong>
+                    </div>
+                </div>
+            </section>
 
-        <hr />
+            <aside class="control-rail">
+                <section class="card plot-setup-card">
+                    <div class="panel-heading compact">
+                        <div>
+                            <p class="eyebrow">Plot setup</p>
+                            <h2>Send to plotter</h2>
+                        </div>
+                    </div>
 
-        <h3 style="text-align: center">Plot Command</h3>
-        <div id="plot-command" style="font-family: courier"></div>
+                    <form name="plot" action="" class="plot-form">
+                        <label for="title">Title</label>
+                        <input type="text" id="title" name="title" placeholder="Artwork Title">
 
-        <hr />
-        <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data">
-            <label for="file">Upload SVG File</label>
-            <input type="file" id="file" name="file" accept=".svg" required>
-            <button id="upload_plot" type="submit">Upload</button>
-        </form>
+                        <label for="layer">Select Layer(s)</label>
+                        <select id="layer" name="layer"></select>
+
+                        <label for="tool">Tool</label>
+                        <select id="tool" name="tool">
+                            <option value="Green Brush Pen">Green Brush Pen</option>
+                            <option value="Lamy Safari Blue">Lamy Safari Blue</option>
+                            <option value="Micron 01 black">Micron 01 black</option>
+                            <option value="Micron 01 Black">Micron 01 Black</option>
+                            <option value="Papermate Flair Fine">Papermate Flair Fine</option>
+                            <option value="Papermate Flair Medium" selected>Papermate Flair Medium</option>
+                            <option value="Pilot Precise v5 Extra Fine Black">Pilot Precise v5 Extra Fine Black</option>
+                            <option value="Rotrin Isograph 0.5 Black">Rotrin Isograph 0.5 Black</option>
+                            <option value="Rotring Isograph 0.1">Rotring Isograph 0.1</option>
+                            <option value="Rotring Isograph 0.2">Rotring Isograph 0.2</option>
+                            <option value="Rotring Isograph 0.3">Rotring Isograph 0.3</option>
+                            <option value="Rotring Isograph 0.4">Rotring Isograph 0.4</option>
+                            <option value="Rotring Isograph 0.5">Rotring Isograph 0.5</option>
+                            <option value="Rotring Isograph 0.5mm with Rotring Ink">Rotring Isograph 0.5mm with Rotring Ink</option>
+                            <option value="Sharpie Fine Point Black">Sharpie Fine Point Black</option>
+                            <option value="Sharpie Fine Point">Sharpie Fine Point</option>
+                            <option value="Stabilo Fine">Stabilo Fine</option>
+                            <option value="Stabilo Fineliner">Stabilo Fineliner</option>
+                            <option value="Stabilo point 88 fine 0,4 magenta">Stabilo point 88 fine 0,4 magenta</option>
+                            <option value="Stabilo point 88 fine 0,4 yellow">Stabilo point 88 fine 0,4 yellow</option>
+                            <option value="Stabilo Yellow">Stabilo Yellow</option>
+                            <option value="Staedtler pigment liner 1.2">Staedtler pigment liner 1.2</option>
+                            <option value="Tul Gel Pen Bold Black">Tul Gel Pen Bold Black</option>
+                        </select>
+
+                        <label for="material">Material</label>
+                        <select id="material" name="material">
+                            <option value="A6 Invitation Envelope 100 GSM">A6 Invitation Envelope 100 GSM</option>
+                            <option value="Index Card">Index Card</option>
+                            <option value="Paper: Arches Watercolor Cold Pressed Cotton 140lb">Paper: Arches Watercolor Cold Pressed Cotton 140lb</option>
+                            <option value="Paper: Canson Mixed Media" selected>Paper: Canson Mixed Media</option>
+                            <option value="Paper: Printer Paper">Paper: Printer Paper</option>
+                            <option value="Paper: Strathmore Bristol smooth 100lb">Paper: Strathmore Bristol smooth 100lb</option>
+                            <option value="Printer Paper">Printer Paper</option>
+                            <option value="Strathmore Bristol smooth 100lb">Strathmore Bristol smooth 100lb</option>
+                        </select>
+
+                        <input type="hidden" name="filename" value="" />
+                        <button id="submit_plot" type="submit" disabled title="Plotter not ready">Plot</button>
+                    </form>
+                    <details>
+                        <summary>Plot Command</summary>
+                        <pre id="plot-command"></pre>
+                    </details>
+                </section>
+            </aside>
+        </main>
+
+        <footer class="app-footer">
+            Created by <a href="https://markroland.com" target="_blank" rel="noreferrer noopener">Mark Roland</a>
+            <span aria-hidden="true">|</span>
+            <a href="https://github.com/markroland/plot-server" target="_blank" rel="noreferrer noopener">View on GitHub</a>
+        </footer>
     </div>
-
-    <h3 style="text-align: center">Sketch Library</h3>
-
-    <div class="file_list">
-        <ol id="files">
-        {% for f in files %}
-            <li><a href="/static/uploads/{{f}}" data-filename="{{f}}">{{f}}</a></li>
-        {% endfor %}
-        </ol>
-    </div>
-
-    <p style="margin-top: 2em; text-align: center;">
-      <a href="https://markroland.com" target="_blank" rel="noreferrer noopener">Created by Mark Roland</a>
-      — <a href="https://github.com/markroland/plot-server" target="_blank" rel="noreferrer noopener">View Source on GitHub</a>
-    </p>
 
     <script>
         // Polling interval ID
@@ -130,6 +179,17 @@
         // Global variables to store plotter and SVG data
         let currentPlotterData = null;
         let currentSvgDimensions = null;
+
+        function setText(selector, value) {
+            const element = document.querySelector(selector);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+        function setSelectedSketch(filename) {
+            setText("#selected-sketch-name", filename || "No sketch selected");
+        }
 
         // Check plotter status with detailed information
         var xhr = new XMLHttpRequest();
@@ -151,7 +211,7 @@
                 }
             } else {
                 console.log("Error: " + xhr.status);
-                document.querySelector("#plotter-status").textContent = "Error";
+                setText("#plotter-status-chip", "Error");
             }
         };
         xhr.send();
@@ -162,7 +222,6 @@
             currentPlotterData = data;
 
             // Show status with color coding
-            const statusElem = document.querySelector("#plotter-status");
             let statusText = data.status;
             let color = "black";
             if (data.status === 'busy') {
@@ -199,53 +258,11 @@
                     busyPollingInterval = null;
                 }
             }
-            statusElem.textContent = statusText;
-            statusElem.style.color = color;
+            setText("#plotter-status-chip", statusText);
+            document.querySelector("#plotter-status-chip").style.color = color;
 
             // Machine information
-            document.querySelector("#plotter-machine").textContent = data.machine;
-
-            // Configuration information
-            if (data.config && Object.keys(data.config).length > 0) {
-                document.querySelector("#plotter-config").style.display = "block";
-
-                // Detailed configuration
-                let configDetails = document.querySelector("#config-details");
-                configDetails.innerHTML = '';
-
-                // Travel dimensions (now in config details)
-                if (data.config.x_travel && data.config.y_travel) {
-                    let travel = `${data.config.x_travel}mm × ${data.config.y_travel}mm`;
-                    let p = document.createElement('p');
-                    p.innerHTML = `<strong>Travel Area:</strong> ${travel}`;
-                    configDetails.appendChild(p);
-                }
-
-                // Pen speeds (now in config details)
-                if (data.config.speed_pendown && data.config.speed_penup) {
-                    let speeds = `Down: ${data.config.speed_pendown}%, Up: ${data.config.speed_penup}%`;
-                    let p = document.createElement('p');
-                    p.innerHTML = `<strong>Pen Speed:</strong> ${speeds}`;
-                    configDetails.appendChild(p);
-                }
-
-                // Create a formatted display of other config values
-                Object.entries(data.config).forEach(([key, value]) => {
-                    if (key !== 'x_travel' && key !== 'y_travel' && key !== 'speed_pendown' && key !== 'speed_penup' && typeof value !== 'object') {
-                        let p = document.createElement('p');
-                        p.innerHTML = `<strong>${key}:</strong> ${value}`;
-                        configDetails.appendChild(p);
-                    }
-                });
-
-                if (data.config.config_file) {
-                    let p = document.createElement('p');
-                    p.innerHTML = `<strong>Config File:</strong> ${data.config.config_file}`;
-                    p.style.fontSize = '0.9em';
-                    p.style.color = '#666';
-                    configDetails.appendChild(p);
-                }
-            }
+            setText("#plotter-machine-chip", data.machine || "Unknown");
 
             // Check SVG fit if we have SVG dimensions
             checkSvgFit();
@@ -297,7 +314,9 @@
         // Function to check if SVG fits within plotter bounds
         function checkSvgFit() {
             if (!currentSvgDimensions || !currentPlotterData?.config?.x_travel || !currentPlotterData?.config?.y_travel) {
-                document.querySelector("#plotter-fit").textContent = "-";
+                const fitElement = document.querySelector("#plotter-fit");
+                fitElement.textContent = "-";
+                fitElement.className = "";
                 return;
             }
 
@@ -373,6 +392,7 @@
                 // Parse file request
                 let filepath = this.getAttribute("href");
                 let filename = this.getAttribute("data-filename");
+                setSelectedSketch(filename);
 
                 // Update the URL with ?sketch={sketchname} (no reload)
                 const url = new URL(window.location);
@@ -458,7 +478,9 @@
             } else {
                 currentSvgDimensions = null;
                 document.querySelector("#svg-dimensions").textContent = "Unable to determine";
-                document.querySelector("#plotter-fit").textContent = "-";
+                const fitElement = document.querySelector("#plotter-fit");
+                fitElement.textContent = "-";
+                fitElement.className = "";
             }
 
             // var parser = new DOMParser();
@@ -540,6 +562,7 @@
                 if (sketchLink) {
                     let filename = sketchLink.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
+                    setSelectedSketch(filename);
                     animateArtworkHeightOnSVGChange(filepath, filename);
                     // Highlight the selected item
                     sketchLink.parentElement.classList.add('selected');
@@ -552,11 +575,20 @@
                 if (first_sketch) {
                     let filename = first_sketch.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
+                    setSelectedSketch(filename);
                     animateArtworkHeightOnSVGChange(filepath, filename);
                     first_sketch.parentElement.classList.add('selected');
                 }
             }
             updatePlotCommand();
+        });
+
+        document.querySelector('#library-search').addEventListener('input', function(event) {
+            const query = event.target.value.trim().toLowerCase();
+            document.querySelectorAll('#files li').forEach((item) => {
+                const filename = item.textContent.trim().toLowerCase();
+                item.style.display = filename.includes(query) ? '' : 'none';
+            });
         });
 
         // Send an API request to start a plot
@@ -580,10 +612,6 @@
 
             event.preventDefault();
 
-            let request = '/plot/upload';
-            if (layer != null) {
-                request += "?layer=" + layer;
-            }
             var xhr = new XMLHttpRequest();
             var formData = new FormData(this);
             xhr.open('POST', '/plot/upload');
