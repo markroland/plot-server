@@ -142,7 +142,7 @@ def index():
                 rel_path = os.path.relpath(os.path.join(root, f), art_dir)
                 plot_files.append(rel_path)
 
-    return render_template('index.html', files=plot_files)
+    return render_template('index.html', files=plot_files, art_dir=art_dir)
 
 def plot(filepath, layer=0):
 
@@ -251,19 +251,21 @@ def plot_request(file):
         uploaded_file.save(filepath)
 
         # Plot the uploaded file
-        if sem.acquire(True, 0.1):
-            try:
-                layer = request.args.get("layer", default=0, type=int)
-                plot(filepath, layer)
-                # os.remove(filepath)
-                return f'Done: {layer}', 200
-            except Exception as e:
-                print(f"[ERROR] Exception during plot: {e}")
-                return f'Error: {e}', 500
-            finally:
-                sem.release()
-        else:
-            return 'Busy', 503
+        # if sem.acquire(True, 0.1):
+        #     try:
+        #         layer = request.args.get("layer", default=0, type=int)
+        #         plot(filepath, layer)
+        #         # os.remove(filepath)
+        #         return f'Done: {layer}', 200
+        #     except Exception as e:
+        #         print(f"[ERROR] Exception during plot: {e}")
+        #         return f'Error: {e}', 500
+        #     finally:
+        #         sem.release()
+        # else:
+        #     return 'Busy', 503
+
+        return '', 200
 
 last_known_status = {
     "status": "off",
@@ -428,14 +430,14 @@ def get_plotter_status():
                 if voltage_value >= 250:
                     status_data["status"] = "on"
                 else:
-                    status_data["status"] = "connected"  # USB connected but powered off
+                    status_data["status"] = "connected (Check Power)"  # USB connected but powered off
 
                 # Add voltage information to status
                 status_data["voltage"] = voltage_value
 
             except (ValueError, IndexError):
                 # If we can't parse voltage, at least we know it's connected
-                status_data["status"] = "connected"
+                status_data["status"] = "connected (Check Power)"
 
             # Disable xy
             ad.options.mode = "manual"
