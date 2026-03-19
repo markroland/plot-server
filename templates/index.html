@@ -68,8 +68,8 @@
     </p>
 
     <script>
-    // Polling interval ID
-    let busyPollingInterval = null;
+        // Polling interval ID
+        let busyPollingInterval = null;
 
         // Global variables to store plotter and SVG data
         let currentPlotterData = null;
@@ -198,7 +198,10 @@
         // Function to extract SVG dimensions
         function extractSvgDimensions(svgDocument) {
             const svgElement = svgDocument.querySelector('svg');
-            if (!svgElement) return null;
+
+            if (!svgElement) {
+                return null;
+            }
 
             let width, height;
 
@@ -304,17 +307,25 @@
 
         document.querySelectorAll("#files a").forEach(item => {
             item.addEventListener("click", function(event){
+
                 // Clear any "selected" list items
                 document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
+
                 // Apply class to highlight clicked item
                 event.target.parentElement.classList.add('selected');
+
                 // Parse file request
                 let filepath = this.getAttribute("href");
                 let filename = this.getAttribute("data-filename");
+
                 // Update the URL with ?sketch={sketchname} (no reload)
                 const url = new URL(window.location);
                 url.searchParams.set('sketch', filename);
                 window.history.replaceState({}, '', url);
+
+                // Update the Plot command
+                updatePlotCommand();
+
                 // Animate .artwork height after SVG loads
                 animateArtworkHeightOnSVGChange(filepath, filename);
                 event.preventDefault();
@@ -386,7 +397,6 @@
         });
 
         // Add event handler to Plot button
-        // document.querySelector('#submit_plot').addEventListener("click", function(event){
         document.querySelector('form[name=plot]').addEventListener("submit", function(event){
 
             // Get plot filename
