@@ -18,7 +18,6 @@
 
     <div class="artwork">
         <object id="svg-object" data="" type="image/svg+xml"></object>
-        <!-- <img src="/static/sketches/radial-lines-1.svg" alt="" /> -->
     </div>
     <div class="svg-info">
         <p><strong>SVG Dimensions:</strong> <span id="svg-dimensions">-</span></p>
@@ -114,7 +113,7 @@
     <div class="file_list">
         <ol id="files">
         {% for f in files %}
-            <li><a href="/static/sketches/{{f}}" data-filename="{{f}}">{{f}}</a></li>
+            <li><a href="/static/uploads/{{f}}" data-filename="{{f}}">{{f}}</a></li>
         {% endfor %}
         </ol>
     </div>
@@ -540,7 +539,7 @@
                 let sketchLink = Array.from(document.querySelectorAll('ol#files li a')).find(a => a.getAttribute('data-filename') === sketchParam);
                 if (sketchLink) {
                     let filename = sketchLink.getAttribute('data-filename');
-                    let filepath = "/static/sketches/" + filename;
+                    let filepath = "/static/uploads/" + filename;
                     animateArtworkHeightOnSVGChange(filepath, filename);
                     // Highlight the selected item
                     sketchLink.parentElement.classList.add('selected');
@@ -552,7 +551,7 @@
                 let first_sketch = document.querySelector('ol#files li a');
                 if (first_sketch) {
                     let filename = first_sketch.getAttribute('data-filename');
-                    let filepath = "/static/sketches/" + filename;
+                    let filepath = "/static/uploads/" + filename;
                     animateArtworkHeightOnSVGChange(filepath, filename);
                     first_sketch.parentElement.classList.add('selected');
                 }
