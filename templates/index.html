@@ -223,6 +223,12 @@
             setText("#selected-sketch-name", filename || "No sketch selected");
         }
 
+        function formatInches(valueInMillimeters) {
+            const valueInInches = valueInMillimeters / 25.4;
+            const fixed = valueInInches.toFixed(1);
+            return fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+        }
+
         function applyTheme(theme) {
             document.documentElement.dataset.theme = theme;
             localStorage.setItem('plot-server-theme', theme);
@@ -682,7 +688,7 @@
             if (dimensions) {
                 currentSvgDimensions = dimensions;
                 document.querySelector("#svg-dimensions").textContent =
-                    `${dimensions.width.toFixed(1)}mm × ${dimensions.height.toFixed(1)}mm`;
+                    `${dimensions.width.toFixed(1)}mm × ${dimensions.height.toFixed(1)}mm (${formatInches(dimensions.width)}" x ${formatInches(dimensions.height)}")`;
 
                 // Check if it fits the plotter
                 checkSvgFit();
