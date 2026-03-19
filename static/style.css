@@ -673,8 +673,9 @@ div.file_list {
   margin-top: 0.65rem;
   width: 100%;
   min-width: 0;
-  max-height: calc(100vh - 19rem);
+  max-height: calc((15 * 2.1rem) + 1.2rem);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--file-list-border);
   border-radius: 1rem;
   background: var(--file-list-bg);
@@ -691,6 +692,7 @@ ol#files li {
   padding: 0.45rem 0.5rem;
   border-radius: 0.6rem;
   font-size: 0.92rem;
+  line-height: 1.2rem;
   min-width: 0;
 }
 
