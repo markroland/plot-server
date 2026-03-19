@@ -37,21 +37,30 @@
                 <section class="card upload-card">
                     <div class="panel-heading compact">
                         <div>
-                            <p class="eyebrow">Library</p>
-                            <h2>Upload artwork</h2>
+                            <p class="eyebrow">Add New Plots</p>
+                            <h2>Upload</h2>
                         </div>
                     </div>
                     <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data" class="upload-form upload-form--stacked">
-                        <label for="file" class="upload-label">Upload SVG</label>
-                        <input type="file" id="file" name="file" accept=".svg" required>
-                        <button id="upload_plot" type="submit">Upload</button>
+                        <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Upload SVG by dragging and dropping or browsing">
+                            <div class="drop-zone-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M12 3l4.5 4.5-1.4 1.4-2.1-2.1V16h-2V6.8L8.9 8.9 7.5 7.5 12 3z"></path>
+                                    <path d="M5 18h14v2H5z"></path>
+                                </svg>
+                            </div>
+                            <div class="drop-zone-text">Drag and drop an SVG or <a href="#" id="browse-link">browse</a></div>
+                            <div class="drop-zone-info">Auto uploads on drop. SVG only.</div>
+                        </div>
+                        <input type="file" id="file" name="file" accept=".svg,image/svg+xml" required hidden>
+                        <div id="upload-status" class="upload-status" aria-live="polite"></div>
                     </form>
                 </section>
 
                 <section class="library-list card">
                     <div class="panel-heading compact">
                         <div>
-                            <p class="eyebrow">Sketch library</p>
+                            <p class="eyebrow">Plot Library</p>
                             <h2>Files</h2>
                         </div>
                     </div>
@@ -59,7 +68,7 @@
                     <div class="library-toolbar">
                         <label class="search-field" for="library-search">
                             <span>Search</span>
-                            <input type="search" id="library-search" placeholder="Filter sketches by filename">
+                            <input type="search" id="library-search" placeholder="Filter plots by filename">
                         </label>
                     </div>
 
@@ -77,7 +86,7 @@
                 <div class="panel-heading">
                     <div>
                         <p class="eyebrow">Artwork preview</p>
-                        <h2 id="selected-sketch-name">No sketch selected</h2>
+                        <h2 id="selected-sketch-name">No plot selected</h2>
                     </div>
                 </div>
 
@@ -104,7 +113,7 @@
                     <div class="panel-heading compact">
                         <div>
                             <p class="eyebrow">Plot setup</p>
-                            <h2>Send to plotter</h2>
+                            <h2>Send to Plotter</h2>
                         </div>
                     </div>
 
@@ -199,6 +208,119 @@
 
         function setSelectedSketch(filename) {
             setText("#selected-sketch-name", filename || "No sketch selected");
+        }
+
+        function setUploadStatus(message, isError = false) {
+            const statusElement = document.querySelector('#upload-status');
+            statusElement.textContent = message;
+            statusElement.className = isError ? 'upload-status upload-status-error' : 'upload-status';
+        }
+
+        function validateUploadFile(file) {
+            if (!file) {
+                setUploadStatus('No file selected', true);
+                return false;
+            }
+
+            const isSvgType = ['image/svg+xml', 'text/xml', 'application/xml'].includes(file.type);
+            const isSvgExtension = file.name.toLowerCase().endsWith('.svg');
+
+            if (!isSvgType && !isSvgExtension) {
+                setUploadStatus('Please upload an SVG file', true);
+                return false;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                setUploadStatus('SVG must be smaller than 5MB', true);
+                return false;
+            }
+
+            return true;
+        }
+
+        function uploadSvgFile(file) {
+            if (!validateUploadFile(file)) {
+                return;
+            }
+
+            setUploadStatus(`Uploading ${file.name}...`);
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/plot/upload');
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    setUploadStatus('Upload complete');
+                    const url = new URL(window.location);
+                    url.searchParams.set('sketch', file.name);
+                    window.location.href = url.toString();
+                } else {
+                    const message = xhr.responseText || 'Upload failed';
+                    setUploadStatus(message, true);
+                }
+            };
+            xhr.onerror = function() {
+                setUploadStatus('Upload failed', true);
+            };
+            xhr.send(formData);
+        }
+
+        function initializeUploadDropZone() {
+            const dropZone = document.querySelector('#drop-zone');
+            const fileInput = document.querySelector('#file');
+            const browseLink = document.querySelector('#browse-link');
+
+            const openFileDialog = () => fileInput.click();
+
+            browseLink.addEventListener('click', function(event) {
+                event.preventDefault();
+                openFileDialog();
+            });
+
+            dropZone.addEventListener('click', function(event) {
+                if (event.target.closest('#browse-link')) {
+                    return;
+                }
+                openFileDialog();
+            });
+
+            dropZone.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openFileDialog();
+                }
+            });
+
+            ['dragenter', 'dragover'].forEach((eventName) => {
+                dropZone.addEventListener(eventName, function(event) {
+                    event.preventDefault();
+                    dropZone.classList.add('drag-over');
+                });
+            });
+
+            ['dragleave', 'dragend'].forEach((eventName) => {
+                dropZone.addEventListener(eventName, function(event) {
+                    event.preventDefault();
+                    if (!dropZone.contains(event.relatedTarget)) {
+                        dropZone.classList.remove('drag-over');
+                    }
+                });
+            });
+
+            dropZone.addEventListener('drop', function(event) {
+                event.preventDefault();
+                dropZone.classList.remove('drag-over');
+                const [file] = event.dataTransfer.files;
+                uploadSvgFile(file);
+            });
+
+            fileInput.addEventListener('change', function(event) {
+                const [file] = event.target.files;
+                uploadSvgFile(file);
+                event.target.value = '';
+            });
         }
 
         async function copyTextToClipboard(text) {
@@ -614,6 +736,7 @@
 
         // On page load, check for ?sketch= param and load that sketch, else load the first
         window.addEventListener("load", function() {
+            initializeUploadDropZone();
             const urlParams = new URLSearchParams(window.location.search);
             let sketchParam = urlParams.get('sketch');
             let found = false;
@@ -667,22 +790,6 @@
             };
             xhr.send();
         }
-
-        // Add event handler to Plot button
-        document.querySelector('form[name=upload-plot]').addEventListener("submit", function(event){
-
-            event.preventDefault();
-
-            var xhr = new XMLHttpRequest();
-            var formData = new FormData(this);
-            xhr.open('POST', '/plot/upload');
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    console.log(xhr.responseText);
-                }
-            };
-            xhr.send(formData);
-        });
 
     </script>
 

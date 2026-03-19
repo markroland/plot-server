@@ -254,6 +254,69 @@ div.artwork {
   overflow: hidden;
 }
 
+.drop-zone {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 1.15rem 0.9rem;
+  border: 2px dashed rgba(33, 91, 82, 0.28);
+  border-radius: 1rem;
+  background: rgba(255, 253, 248, 0.88);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.drop-zone:hover,
+.drop-zone:focus-visible,
+.drop-zone.drag-over {
+  border-color: rgba(33, 91, 82, 0.7);
+  background: rgba(238, 246, 243, 0.98);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.drop-zone-icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: rgba(33, 91, 82, 0.1);
+  color: var(--action);
+}
+
+.drop-zone-icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  fill: currentColor;
+}
+
+.drop-zone-text {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.drop-zone-text a {
+  color: var(--action);
+}
+
+.drop-zone-info {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.upload-status {
+  min-height: 1.1rem;
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.upload-status.upload-status-error {
+  color: var(--danger);
+}
+
 .plot-setup-card {
   padding: 1.2rem;
 }
@@ -377,6 +440,10 @@ div.artwork {
   flex-direction: column;
   align-items: stretch;
   gap: 0.55rem;
+}
+
+.upload-form--stacked input[type="file"][hidden] {
+  display: none;
 }
 
 .upload-form--stacked input[type="file"] {
