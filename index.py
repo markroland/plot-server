@@ -430,14 +430,14 @@ def get_plotter_status():
                 if voltage_value >= 250:
                     status_data["status"] = "on"
                 else:
-                    status_data["status"] = "connected"  # USB connected but powered off
+                    status_data["status"] = "connected (Check Power)"  # USB connected but powered off
 
                 # Add voltage information to status
                 status_data["voltage"] = voltage_value
 
             except (ValueError, IndexError):
                 # If we can't parse voltage, at least we know it's connected
-                status_data["status"] = "connected"
+                status_data["status"] = "connected (Check Power)"
 
             # Disable xy
             ad.options.mode = "manual"
