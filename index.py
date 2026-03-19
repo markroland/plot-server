@@ -142,7 +142,7 @@ def index():
                 rel_path = os.path.relpath(os.path.join(root, f), art_dir)
                 plot_files.append(rel_path)
 
-    return render_template('index.html', files=plot_files)
+    return render_template('index.html', files=plot_files, art_dir=art_dir)
 
 def plot(filepath, layer=0):
 

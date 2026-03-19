@@ -43,9 +43,64 @@
         <form name="plot" action="">
             <label for="layer">Select Layer(s)</label>
             <select id="layer" name="layer"></select>
+
+            <br />
+
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" placeholder="Artwork Title">
+
+            <br />
+
+            <label for="tool">Tool</label>
+            <select id="tool" name="tool">
+                <option value="Green Brush Pen">Green Brush Pen</option>
+                <option value="Lamy Safari Blue">Lamy Safari Blue</option>
+                <option value="Micron 01 black">Micron 01 black</option>
+                <option value="Micron 01 Black">Micron 01 Black</option>
+                <option value="Papermate Flair Fine">Papermate Flair Fine</option>
+                <option value="Papermate Flair Medium" selected>Papermate Flair Medium</option>
+                <option value="Pilot Precise v5 Extra Fine Black">Pilot Precise v5 Extra Fine Black</option>
+                <option value="Rotrin Isograph 0.5 Black">Rotrin Isograph 0.5 Black</option>
+                <option value="Rotring Isograph 0.1">Rotring Isograph 0.1</option>
+                <option value="Rotring Isograph 0.2">Rotring Isograph 0.2</option>
+                <option value="Rotring Isograph 0.3">Rotring Isograph 0.3</option>
+                <option value="Rotring Isograph 0.4">Rotring Isograph 0.4</option>
+                <option value="Rotring Isograph 0.5">Rotring Isograph 0.5</option>
+                <option value="Rotring Isograph 0.5mm with Rotring Ink">Rotring Isograph 0.5mm with Rotring Ink</option>
+                <option value="Sharpie Fine Point Black">Sharpie Fine Point Black</option>
+                <option value="Sharpie Fine Point">Sharpie Fine Point</option>
+                <option value="Stabilo Fine">Stabilo Fine</option>
+                <option value="Stabilo Fineliner">Stabilo Fineliner</option>
+                <option value="Stabilo point 88 fine 0,4 magenta">Stabilo point 88 fine 0,4 magenta</option>
+                <option value="Stabilo point 88 fine 0,4 yellow">Stabilo point 88 fine 0,4 yellow</option>
+                <option value="Stabilo Yellow">Stabilo Yellow</option>
+                <option value="Staedtler pigment liner 1.2">Staedtler pigment liner 1.2</option>
+                <option value="Tul Gel Pen Bold Black">Tul Gel Pen Bold Black</option>
+            </select>
+
+            <br />
+
+            <label for="material">Material</label>
+            <select id="material" name="material">
+                <option value="A6 Invitation Envelope 100 GSM">A6 Invitation Envelope 100 GSM</option>
+                <option value="Index Card">Index Card</option>
+                <option value="Paper: Arches Watercolor Cold Pressed Cotton 140lb">Paper: Arches Watercolor Cold Pressed Cotton 140lb</option>
+                <option value="Paper: Canson Mixed Media" selected>Paper: Canson Mixed Media</option>
+                <option value="Paper: Printer Paper">Paper: Printer Paper</option>
+                <option value="Paper: Strathmore Bristol smooth 100lb">Paper: Strathmore Bristol smooth 100lb</option>
+                <option value="Printer Paper">Printer Paper</option>
+                <option value="Strathmore Bristol smooth 100lb">Strathmore Bristol smooth 100lb</option>
+            </select>
+
             <input type="hidden" name="filename" value="" />
             <button id="submit_plot" type="submit" disabled>Plot</button>
         </form>
+
+        <hr />
+
+        <h3 style="text-align: center">Plot Command</h3>
+        <div id="plot-command" style="font-family: courier"></div>
+
         <hr />
         <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data">
             <label for="file">Upload SVG File</label>
@@ -332,6 +387,58 @@
             })
         });
 
+        function updatePlotCommand() {
+
+            const svg = document.getElementById('svg-object');
+
+            const filename = svg.getAttribute('data-filename') || "";
+            const title = document.querySelector("input[name=title]").value || "";
+            const tool = document.querySelector("select[name=tool]").value;
+            const material = document.querySelector("select[name=material]").value;
+            const layer = document.querySelector("select[name=layer]").value || "all";
+
+            let command = `plot -f "{{ art_dir }}/${filename}"`;
+            if (title) {
+                command += ` -t "${title}"`;
+            }
+
+            const editions = 1;
+            const edition_number = 1;
+
+            command += ` -e ${editions} -x ${edition_number} -i "${tool}" -p "${material}"`;
+
+            if (layer !== "all") {
+                command += ` -y "${layer}"`;
+            }
+
+            const svgObject = document.getElementById('svg-object').contentDocument;
+            const dimensions = extractSvgDimensions(svgObject);
+            if (dimensions) {
+
+                // Option 1: Use mm returned by extractSvgDimensions
+                // command += ` -l "${dimensions.width.toFixed(1)}×${dimensions.height.toFixed(1)}"`;
+
+                // Option 2: Convert from mm to inches
+                const width_inches = dimensions.width / 25.4;
+                const height_inches = dimensions.height / 25.4;
+
+                // Store dimensions with trimmed format (remove ".0" for whole numbers)
+                const formatDimension = (value) => {
+                    const fixed = value.toFixed(1);
+                    return fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+                };
+                command += ` -l "${formatDimension(width_inches)}×${formatDimension(height_inches)}"`;
+
+                if (dimensions.width > dimensions.height) {
+                    command += ` -o "Landscape"`;
+                } else {
+                    command += ` -o "Portrait"`;
+                }
+            }
+
+            document.querySelector("#plot-command").textContent = command;
+        }
+
         // Extract information about the SVG file after it has loaded
         document.querySelector("#svg-object").addEventListener("load", function() {
 
@@ -394,6 +501,13 @@
                 opt.textContent = item;
                 select_menu.appendChild(opt);
             });
+
+            updatePlotCommand();
+        });
+
+        // Call updatePlotCommand whenever a plot option changes
+        document.querySelectorAll('form[name=plot] input, form[name=plot] select').forEach(elem => {
+            elem.addEventListener("change", updatePlotCommand);
         });
 
         // Add event handler to Plot button
@@ -441,6 +555,7 @@
                     first_sketch.parentElement.classList.add('selected');
                 }
             }
+            updatePlotCommand();
         });
 
         // Send an API request to start a plot
