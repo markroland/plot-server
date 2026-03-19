@@ -251,19 +251,21 @@ def plot_request(file):
         uploaded_file.save(filepath)
 
         # Plot the uploaded file
-        if sem.acquire(True, 0.1):
-            try:
-                layer = request.args.get("layer", default=0, type=int)
-                plot(filepath, layer)
-                # os.remove(filepath)
-                return f'Done: {layer}', 200
-            except Exception as e:
-                print(f"[ERROR] Exception during plot: {e}")
-                return f'Error: {e}', 500
-            finally:
-                sem.release()
-        else:
-            return 'Busy', 503
+        # if sem.acquire(True, 0.1):
+        #     try:
+        #         layer = request.args.get("layer", default=0, type=int)
+        #         plot(filepath, layer)
+        #         # os.remove(filepath)
+        #         return f'Done: {layer}', 200
+        #     except Exception as e:
+        #         print(f"[ERROR] Exception during plot: {e}")
+        #         return f'Error: {e}', 500
+        #     finally:
+        #         sem.release()
+        # else:
+        #     return 'Busy', 503
+
+        return '', 200
 
 last_known_status = {
     "status": "off",

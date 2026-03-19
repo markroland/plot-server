@@ -50,7 +50,7 @@
         <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data">
             <label for="file">Upload SVG File</label>
             <input type="file" id="file" name="file" accept=".svg" required>
-            <button id="upload_plot" type="submit" disabled>Plot</button>
+            <button id="upload_plot" type="submit">Upload</button>
         </form>
     </div>
 
@@ -90,7 +90,6 @@
                 if (plotterData.status === "on") {
                     console.log("Plotter is ready");
                     document.querySelector("#submit_plot").disabled = false;
-                    document.querySelector("#upload_plot").disabled = false;
                 } else {
                     console.log("Plotter status:", plotterData.status);
                 }
@@ -455,8 +454,6 @@
 
             event.preventDefault();
 
-            document.querySelector("#upload_plot").disabled = true;
-
             let request = '/plot/upload';
             if (layer != null) {
                 request += "?layer=" + layer;
@@ -467,7 +464,6 @@
             xhr.onload = function() {
                 if (xhr.status === 200) {
                     console.log(xhr.responseText);
-                    document.querySelector("#upload_plot").disabled = false;
                 }
             };
             xhr.send(formData);
