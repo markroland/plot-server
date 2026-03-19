@@ -4,6 +4,13 @@
     <meta charset="utf-8">
     <title>Plot Server</title>
     <meta name="viewport" content="width = device-width, initial-scale = 1, maximum-scale = 1" />
+    <script>
+        (() => {
+            const storedTheme = localStorage.getItem('plot-server-theme');
+            const preferredTheme = storedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.dataset.theme = preferredTheme;
+        })();
+    </script>
     <link rel="stylesheet" type="text/css" href="/static/style.css">
     <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png">
@@ -12,7 +19,7 @@
     <link rel="manifest" href="/static/site.webmanifest">
     <link rel="mask-icon" href="/static/images/safari-pinned-tab.svg" color="#000000">
     <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="theme-color" content="#ffffff">
+    <meta id="theme-color-meta" name="theme-color" content="#d8d1c7">
 </head>
 <body>
     <div class="app-shell">
@@ -21,6 +28,12 @@
                 <h1>Plot Server</h1>
             </div>
             <div class="header-status" aria-label="Plotter summary">
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Toggle color theme">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 3a1 1 0 0 1 1 1v1.2a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1zm0 14a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm8-6a1 1 0 0 1 1 1 1 1 0 0 1-1 1h-1.2a1 1 0 1 1 0-2H20zM5.2 11a1 1 0 1 1 0 2H4a1 1 0 1 1 0-2h1.2zm11.46-5.04 0 0a1 1 0 0 1 1.41 0l.85.85a1 1 0 1 1-1.41 1.41l-.85-.85a1 1 0 0 1 0-1.41zM6.08 16.5a1 1 0 0 1 1.41 0l.85.85a1 1 0 1 1-1.41 1.41l-.85-.85a1 1 0 0 1 0-1.41zm11.69.85.85-.85a1 1 0 1 1 1.41 1.41l-.85.85a1 1 0 0 1-1.41-1.41zM6.08 7.5l-.85-.85A1 1 0 1 1 6.64 5.24l.85.85A1 1 0 0 1 6.08 7.5z"></path>
+                    </svg>
+                    <span id="theme-toggle-label">Dark mode</span>
+                </button>
                 <div class="status-chip">
                     <span class="status-chip__label">Machine</span>
                     <strong id="plotter-machine-chip">Unknown</strong>
@@ -208,6 +221,38 @@
 
         function setSelectedSketch(filename) {
             setText("#selected-sketch-name", filename || "No sketch selected");
+        }
+
+        function applyTheme(theme) {
+            document.documentElement.dataset.theme = theme;
+            localStorage.setItem('plot-server-theme', theme);
+
+            const label = document.querySelector('#theme-toggle-label');
+            const button = document.querySelector('#theme-toggle');
+            const themeMeta = document.querySelector('#theme-color-meta');
+            const isDark = theme === 'dark';
+
+            if (label) {
+                label.textContent = isDark ? 'Light mode' : 'Dark mode';
+            }
+
+            if (button) {
+                button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+            }
+
+            if (themeMeta) {
+                themeMeta.setAttribute('content', isDark ? '#13110f' : '#d8d1c7');
+            }
+        }
+
+        function initializeThemeToggle() {
+            const currentTheme = document.documentElement.dataset.theme || 'light';
+            applyTheme(currentTheme);
+
+            document.querySelector('#theme-toggle').addEventListener('click', function() {
+                const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+                applyTheme(nextTheme);
+            });
         }
 
         function setUploadStatus(message, isError = false) {
@@ -736,6 +781,7 @@
 
         // On page load, check for ?sketch= param and load that sketch, else load the first
         window.addEventListener("load", function() {
+            initializeThemeToggle();
             initializeUploadDropZone();
             const urlParams = new URLSearchParams(window.location.search);
             let sketchParam = urlParams.get('sketch');

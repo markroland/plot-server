@@ -6,6 +6,8 @@
   --line: #b8ae9f;
   --text: #2f2924;
   --muted: #6d6257;
+  --link: #235ea6;
+  --link-hover: #143a67;
   --shadow: 0 16px 30px rgba(59, 46, 35, 0.12);
   --shadow-strong: 0 22px 50px rgba(59, 46, 35, 0.18);
   --success: #2f7d4b;
@@ -13,7 +15,85 @@
   --warning: #b87317;
   --action: #215b52;
   --action-hover: #173f39;
+  --button-disabled-bg: #7f766c;
+  --button-disabled-text: #efeae2;
+  --header-bg: rgba(250, 247, 242, 0.88);
+  --header-border: rgba(80, 62, 47, 0.12);
+  --header-shadow: 0 10px 30px rgba(59, 46, 35, 0.14);
+  --chip-bg: rgba(255, 251, 245, 0.75);
+  --chip-border: rgba(80, 62, 47, 0.14);
+  --chip-shadow: 0 10px 25px rgba(59, 46, 35, 0.07);
+  --card-border: rgba(80, 62, 47, 0.12);
+  --frame-start: rgba(255, 255, 255, 0.8);
+  --frame-end: rgba(233, 226, 214, 0.75);
+  --frame-pattern: rgba(112, 96, 77, 0.04);
+  --frame-border: rgba(80, 62, 47, 0.08);
+  --input-bg: rgba(255, 253, 248, 0.9);
+  --details-bg: rgba(255, 253, 248, 0.95);
+  --details-border: rgba(80, 62, 47, 0.1);
+  --drop-zone-bg: rgba(255, 253, 248, 0.88);
+  --drop-zone-bg-hover: rgba(238, 246, 243, 0.98);
+  --drop-zone-border: rgba(33, 91, 82, 0.28);
+  --drop-zone-border-hover: rgba(33, 91, 82, 0.7);
+  --icon-bg: rgba(33, 91, 82, 0.1);
+  --copy-button-bg: rgba(33, 91, 82, 0.1);
+  --copy-button-bg-hover: rgba(33, 91, 82, 0.16);
+  --file-list-bg: rgba(255, 253, 248, 0.82);
+  --file-list-border: rgba(80, 62, 47, 0.12);
+  --selected-item-bg: #efe0a6;
+  --footer-bg: rgba(250, 247, 242, 0.72);
+  --footer-border: rgba(80, 62, 47, 0.08);
+  --footer-shadow: 0 -4px 14px rgba(59, 46, 35, 0.05);
   --footer-height: 3.5rem;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #151210;
+  --bg-accent: #1d1815;
+  --panel: rgba(35, 30, 27, 0.96);
+  --panel-strong: #201b18;
+  --line: #564c45;
+  --text: #efe8de;
+  --muted: #b4a89d;
+  --link: #8ab4ff;
+  --link-hover: #b8d1ff;
+  --shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
+  --shadow-strong: 0 24px 52px rgba(0, 0, 0, 0.42);
+  --success: #65c288;
+  --danger: #ff8b7a;
+  --warning: #f3bd63;
+  --action: #5aa596;
+  --action-hover: #77b8ab;
+  --button-disabled-bg: #4d4540;
+  --button-disabled-text: #d5cbc1;
+  --header-bg: rgba(24, 20, 17, 0.88);
+  --header-border: rgba(255, 255, 255, 0.08);
+  --header-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  --chip-bg: rgba(44, 38, 34, 0.76);
+  --chip-border: rgba(255, 255, 255, 0.08);
+  --chip-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --frame-start: rgba(40, 34, 31, 0.88);
+  --frame-end: rgba(26, 22, 20, 0.86);
+  --frame-pattern: rgba(255, 255, 255, 0.03);
+  --frame-border: rgba(255, 255, 255, 0.06);
+  --input-bg: rgba(32, 27, 24, 0.94);
+  --details-bg: rgba(30, 26, 23, 0.95);
+  --details-border: rgba(255, 255, 255, 0.08);
+  --drop-zone-bg: rgba(31, 27, 24, 0.92);
+  --drop-zone-bg-hover: rgba(36, 39, 37, 0.98);
+  --drop-zone-border: rgba(90, 165, 150, 0.4);
+  --drop-zone-border-hover: rgba(119, 184, 171, 0.85);
+  --icon-bg: rgba(90, 165, 150, 0.18);
+  --copy-button-bg: rgba(90, 165, 150, 0.16);
+  --copy-button-bg-hover: rgba(90, 165, 150, 0.26);
+  --file-list-bg: rgba(31, 27, 24, 0.92);
+  --file-list-border: rgba(255, 255, 255, 0.08);
+  --selected-item-bg: rgba(146, 118, 57, 0.45);
+  --footer-bg: rgba(22, 19, 17, 0.8);
+  --footer-border: rgba(255, 255, 255, 0.06);
+  --footer-shadow: 0 -4px 14px rgba(0, 0, 0, 0.22);
 }
 
 html {
@@ -36,11 +116,11 @@ body {
 }
 
 a {
-  color: #235ea6;
+  color: var(--link);
 }
 
 a:hover {
-  color: #143a67;
+  color: var(--link-hover);
 }
 
 button,
@@ -69,8 +149,8 @@ button:hover {
 }
 
 button:disabled {
-  background: #7f766c;
-  color: #efeae2;
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-text);
   cursor: not-allowed;
   opacity: 0.65;
   transform: none;
@@ -98,10 +178,36 @@ button:disabled {
   width: 100%;
   padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
-  background: rgba(250, 247, 242, 0.88);
-  border-bottom: 1px solid rgba(80, 62, 47, 0.12);
-  box-shadow: 0 10px 30px rgba(59, 46, 35, 0.14);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  box-shadow: var(--header-shadow);
   backdrop-filter: blur(14px);
+}
+
+.theme-toggle {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.95rem;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  background: var(--chip-bg);
+  color: var(--text);
+  border: 1px solid var(--chip-border);
+  box-shadow: var(--chip-shadow);
+}
+
+.theme-toggle:hover {
+  background: var(--details-bg);
+}
+
+.theme-toggle svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.theme-toggle span {
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .app-header h1,
@@ -139,10 +245,10 @@ button:disabled {
   gap: 0.25rem;
   min-width: 9rem;
   padding: 0.85rem 1rem;
-  border: 1px solid rgba(80, 62, 47, 0.14);
+  border: 1px solid var(--chip-border);
   border-radius: 1rem;
-  background: rgba(255, 251, 245, 0.75);
-  box-shadow: 0 10px 25px rgba(59, 46, 35, 0.07);
+  background: var(--chip-bg);
+  box-shadow: var(--chip-shadow);
 }
 
 .status-chip__label,
@@ -177,7 +283,7 @@ button:disabled {
 
 .card {
   background: var(--panel);
-  border: 1px solid rgba(80, 62, 47, 0.12);
+  border: 1px solid var(--card-border);
   border-radius: 1.5rem;
   box-shadow: var(--shadow);
 }
@@ -206,9 +312,9 @@ button:disabled {
   padding: clamp(1rem, 2vw, 1.75rem);
   border-radius: 1.25rem;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(233, 226, 214, 0.75)),
-    repeating-linear-gradient(0deg, rgba(112, 96, 77, 0.04), rgba(112, 96, 77, 0.04) 1px, transparent 1px, transparent 18px);
-  border: 1px solid rgba(80, 62, 47, 0.08);
+    linear-gradient(135deg, var(--frame-start), var(--frame-end)),
+    repeating-linear-gradient(0deg, var(--frame-pattern), var(--frame-pattern) 1px, transparent 1px, transparent 18px);
+  border: 1px solid var(--frame-border);
   min-height: 520px;
 }
 
@@ -230,7 +336,7 @@ div.artwork {
   width: 100% !important;
   height: auto !important;
   padding: 1rem;
-  border: 1px solid rgba(80, 62, 47, 0.08);
+  border: 1px solid var(--frame-border);
   box-shadow: var(--shadow-strong);
 }
 
@@ -259,9 +365,9 @@ div.artwork {
   justify-items: center;
   gap: 0.45rem;
   padding: 1.15rem 0.9rem;
-  border: 2px dashed rgba(33, 91, 82, 0.28);
+  border: 2px dashed var(--drop-zone-border);
   border-radius: 1rem;
-  background: rgba(255, 253, 248, 0.88);
+  background: var(--drop-zone-bg);
   text-align: center;
   cursor: pointer;
   transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
@@ -270,8 +376,8 @@ div.artwork {
 .drop-zone:hover,
 .drop-zone:focus-visible,
 .drop-zone.drag-over {
-  border-color: rgba(33, 91, 82, 0.7);
-  background: rgba(238, 246, 243, 0.98);
+  border-color: var(--drop-zone-border-hover);
+  background: var(--drop-zone-bg-hover);
   transform: translateY(-1px);
   outline: none;
 }
@@ -282,7 +388,7 @@ div.artwork {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
-  background: rgba(33, 91, 82, 0.1);
+  background: var(--icon-bg);
   color: var(--action);
 }
 
@@ -343,7 +449,7 @@ div.artwork {
   padding: 0.7rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: 0.9rem;
-  background: rgba(255, 253, 248, 0.9);
+  background: var(--input-bg);
   color: var(--text);
 }
 
@@ -355,8 +461,8 @@ div.artwork {
 .plot-setup-card details {
   margin-top: 1rem;
   border-radius: 1rem;
-  background: rgba(255, 253, 248, 0.95);
-  border: 1px solid rgba(80, 62, 47, 0.1);
+  background: var(--details-bg);
+  border: 1px solid var(--details-border);
 }
 
 .plot-setup-card summary {
@@ -385,14 +491,14 @@ div.artwork {
   min-width: 2rem;
   padding: 0.4rem 0.75rem;
   border-radius: 0.7rem;
-  background: rgba(33, 91, 82, 0.1);
+  background: var(--copy-button-bg);
   color: var(--action);
   font-size: 0.82rem;
   font-weight: 600;
 }
 
 #copy-plot-command:hover {
-  background: rgba(33, 91, 82, 0.16);
+  background: var(--copy-button-bg-hover);
 }
 
 #copy-plot-command svg {
@@ -422,7 +528,7 @@ div.artwork {
   font-size: 0.84rem;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #3e352d;
+  color: var(--text);
 }
 
 .upload-form {
@@ -481,9 +587,9 @@ div.file_list {
   min-width: 0;
   max-height: calc(100vh - 19rem);
   overflow-y: auto;
-  border: 1px solid rgba(80, 62, 47, 0.12);
+  border: 1px solid var(--file-list-border);
   border-radius: 1rem;
-  background: rgba(255, 253, 248, 0.82);
+  background: var(--file-list-bg);
 }
 
 ol#files {
@@ -501,7 +607,7 @@ ol#files li {
 }
 
 ol#files li.selected {
-  background: #efe0a6;
+  background: var(--selected-item-bg);
 }
 
 ol#files li a {
@@ -541,9 +647,9 @@ ol#files li a:hover {
   padding: 0.65rem 1.25rem;
   font-size: 0.92rem;
   color: var(--muted);
-  background: rgba(250, 247, 242, 0.72);
-  border-top: 1px solid rgba(80, 62, 47, 0.08);
-  box-shadow: 0 -4px 14px rgba(59, 46, 35, 0.05);
+  background: var(--footer-bg);
+  border-top: 1px solid var(--footer-border);
+  box-shadow: var(--footer-shadow);
   backdrop-filter: blur(8px);
 }
 
@@ -556,6 +662,10 @@ ol#files li a:hover {
   .app-header {
     flex-direction: column;
     align-items: start;
+  }
+  .header-status {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .workspace {
@@ -605,6 +715,10 @@ ol#files li a:hover {
   .plot-command-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+  .theme-toggle {
+    width: 100%;
+    justify-content: center;
   }
 
   .upload-form input[type="file"] {
