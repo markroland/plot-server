@@ -306,9 +306,55 @@ div.artwork {
   padding: 0.9rem 1rem;
 }
 
+.plot-command-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-start;
+  padding: 0 1rem 1rem;
+}
+
+#copy-plot-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  min-width: 2rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.7rem;
+  background: rgba(33, 91, 82, 0.1);
+  color: var(--action);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+#copy-plot-command:hover {
+  background: rgba(33, 91, 82, 0.16);
+}
+
+#copy-plot-command svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  fill: currentColor;
+}
+
+#copy-plot-command-status {
+  min-height: 1.2rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.copy-status {
+  color: var(--success);
+}
+
+.copy-status.copy-status-error {
+  color: var(--danger);
+}
+
 #plot-command {
   margin: 0;
-  padding: 0 1rem 1rem;
+  padding: 0 1rem 0.75rem;
   font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
   font-size: 0.84rem;
   white-space: pre-wrap;
@@ -485,6 +531,11 @@ ol#files li a:hover {
   }
 
   .app-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .plot-command-actions {
     flex-direction: column;
     align-items: stretch;
   }

@@ -160,6 +160,16 @@
                     <details>
                         <summary>Plot Command</summary>
                         <pre id="plot-command"></pre>
+                        <div class="plot-command-actions">
+                            <button id="copy-plot-command" type="button" aria-label="Copy plot command" title="Copy plot command">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                    <path d="M9 9h10v12H9z"></path>
+                                    <path d="M5 3h10v4H7v10H5z"></path>
+                                </svg>
+                                <span>Copy to Clipboard</span>
+                            </button>
+                            <span id="copy-plot-command-status" aria-live="polite"></span>
+                        </div>
                     </details>
                 </section>
             </aside>
@@ -189,6 +199,40 @@
 
         function setSelectedSketch(filename) {
             setText("#selected-sketch-name", filename || "No sketch selected");
+        }
+
+        async function copyTextToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.setAttribute('readonly', '');
+            textArea.style.position = 'absolute';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
+
+        let copyPlotCommandTimeout = null;
+
+        function showCopyPlotCommandStatus(message, isError = false) {
+            const statusElement = document.querySelector('#copy-plot-command-status');
+            statusElement.textContent = message;
+            statusElement.className = isError ? 'copy-status copy-status-error' : 'copy-status';
+
+            if (copyPlotCommandTimeout) {
+                clearTimeout(copyPlotCommandTimeout);
+            }
+
+            copyPlotCommandTimeout = setTimeout(() => {
+                statusElement.textContent = '';
+                statusElement.className = '';
+            }, 2000);
         }
 
         // Check plotter status with detailed information
@@ -531,6 +575,23 @@
         // Call updatePlotCommand whenever a plot option changes
         document.querySelectorAll('form[name=plot] input, form[name=plot] select').forEach(elem => {
             elem.addEventListener("change", updatePlotCommand);
+        });
+
+        document.querySelector('#copy-plot-command').addEventListener('click', async function() {
+            const command = document.querySelector('#plot-command').textContent.trim();
+
+            if (!command) {
+                showCopyPlotCommandStatus('Nothing to copy', true);
+                return;
+            }
+
+            try {
+                await copyTextToClipboard(command);
+                showCopyPlotCommandStatus('Copied');
+            } catch (error) {
+                console.error('Failed to copy plot command:', error);
+                showCopyPlotCommandStatus('Copy failed', true);
+            }
         });
 
         // Add event handler to Plot button
