@@ -20,6 +20,7 @@
     <link rel="mask-icon" href="/static/images/safari-pinned-tab.svg" color="#000000">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta id="theme-color-meta" name="theme-color" content="#d8d1c7">
+    <script src="/static/js/simple-plot-animator.umd.js"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -98,16 +99,35 @@
             <section class="preview-panel card">
                 <div class="panel-heading">
                     <div>
-                        <p class="eyebrow">Artwork preview</p>
+                        <p class="eyebrow">Plot Preview</p>
                         <h2 id="selected-sketch-name">No plot selected</h2>
                     </div>
                 </div>
 
                 <div class="artwork-frame">
                     <div class="artwork">
-                        <object id="svg-object" data="" type="image/svg+xml"></object>
+                        <div id="svg-object"></div>
                     </div>
                 </div>
+
+                <section id="playback-controls" class="playback-controls">
+                    <span class="info-tile__label">Playback Controls</span>
+                    <div class="controls-bar">
+                        <button id="play-pause-btn" class="control-btn" type="button" disabled>Play</button>
+                        <button id="reset-btn" class="control-btn" type="button" disabled>Reset</button>
+                        <div class="progress-info">
+                            <span id="progress-text">0 / 0</span>
+                        </div>
+                        <div class="speed-control">
+                            <label for="speed-slider">Frame delay</label>
+                            <input type="range" id="speed-slider" min="1" max="100" value="3" disabled>
+                            <span id="speed-display">3 ms</span>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="progress-fill"></div>
+                    </div>
+                </section>
 
                 <div class="svg-info-grid">
                     <div class="info-tile">
@@ -211,6 +231,8 @@
         // Global variables to store plotter and SVG data
         let currentPlotterData = null;
         let currentSvgDimensions = null;
+        let currentAnimator = null;
+        let isPlaybackActive = false;
 
         function setText(selector, value) {
             const element = document.querySelector(selector);
@@ -220,7 +242,67 @@
         }
 
         function setSelectedSketch(filename) {
-            setText("#selected-sketch-name", filename || "No sketch selected");
+            setText("#selected-sketch-name", `File: ${filename || "No sketch selected"}`);
+        }
+
+        function getCurrentSvgElement() {
+            return document.querySelector('#svg-object svg');
+        }
+
+        function setPlaybackButtonState(isPlaying) {
+            isPlaybackActive = isPlaying;
+            setText('#play-pause-btn', isPlaying ? 'Pause' : 'Play');
+        }
+
+        function updatePlaybackProgress(progress) {
+            const current = Math.min(progress.current, progress.total);
+            setText('#progress-text', `${current} / ${progress.total}`);
+
+            const percentage = progress.total > 0 ? Math.round((current / progress.total) * 100) : 0;
+            document.querySelector('#progress-fill').style.width = `${percentage}%`;
+        }
+
+        function setPlaybackControlsEnabled(enabled) {
+            document.querySelector('#play-pause-btn').disabled = !enabled;
+            document.querySelector('#reset-btn').disabled = !enabled;
+            document.querySelector('#speed-slider').disabled = !enabled;
+        }
+
+        function initializePlaybackControls() {
+            const speedSlider = document.querySelector('#speed-slider');
+
+            document.querySelector('#play-pause-btn').addEventListener('click', function() {
+                if (!currentAnimator) {
+                    return;
+                }
+
+                if (isPlaybackActive) {
+                    currentAnimator.pause();
+                    setPlaybackButtonState(false);
+                } else {
+                    currentAnimator.play();
+                    setPlaybackButtonState(true);
+                }
+            });
+
+            document.querySelector('#reset-btn').addEventListener('click', function() {
+                if (!currentAnimator) {
+                    return;
+                }
+
+                currentAnimator.reset();
+                updatePlaybackProgress({ current: 0, total: currentAnimator.paths.length, percentage: 0 });
+                setPlaybackButtonState(false);
+            });
+
+            speedSlider.addEventListener('input', function(event) {
+                const value = Number(event.target.value);
+                setText('#speed-display', `${value} ms`);
+
+                if (currentAnimator) {
+                    currentAnimator.setSpeed(value);
+                }
+            });
         }
 
         function formatInches(valueInMillimeters) {
@@ -487,7 +569,7 @@
 
         // Function to extract SVG dimensions
         function extractSvgDimensions(svgDocument) {
-            const svgElement = svgDocument.querySelector('svg');
+            const svgElement = svgDocument?.tagName === 'svg' ? svgDocument : svgDocument?.querySelector('svg');
 
             if (!svgElement) {
                 return null;
@@ -574,31 +656,111 @@
             }
         }
 
-        // Add event handler to each file link
-        // Helper to animate .artwork height after SVG loads
-        function animateArtworkHeightOnSVGChange(filepath, filename) {
-            const svgObject = document.querySelector('#svg-object');
-            // Remove previous load handler
-            svgObject.onload = null;
-            // Change SVG only if different, else force reload by changing to dummy and back
-            let forceReload = false;
-            if (svgObject.getAttribute('data-filename') === filename) {
-                forceReload = true;
+        function analyzeLoadedSvg(filename) {
+            const svgElement = getCurrentSvgElement();
+
+            if (!svgElement) {
+                currentSvgDimensions = null;
+                document.querySelector("#svg-dimensions").textContent = "Unable to determine";
+                const fitElement = document.querySelector("#plotter-fit");
+                fitElement.textContent = "-";
+                fitElement.className = "";
+                return;
             }
-            function setSVG() {
-                svgObject.setAttribute('data', filepath);
-                svgObject.setAttribute('data-filename', filename);
-            }
-            if (forceReload) {
-                svgObject.setAttribute('data', 'about:blank');
-                setTimeout(setSVG, 10);
+
+            const dimensions = extractSvgDimensions(svgElement);
+            if (dimensions) {
+                currentSvgDimensions = dimensions;
+                document.querySelector("#svg-dimensions").textContent =
+                    `${dimensions.width.toFixed(1)}mm × ${dimensions.height.toFixed(1)}mm (${formatInches(dimensions.width)}" x ${formatInches(dimensions.height)}")`;
+                checkSvgFit();
             } else {
-                setSVG();
+                currentSvgDimensions = null;
+                document.querySelector("#svg-dimensions").textContent = "Unable to determine";
+                const fitElement = document.querySelector("#plotter-fit");
+                fitElement.textContent = "-";
+                fitElement.className = "";
             }
+
+            const groups = svgElement.querySelectorAll('g');
+            let layers = [];
+            let layer_regex = new RegExp(/^\d/);
+            groups.forEach((item) => {
+                if (item.hasAttribute("inkscape:label")) {
+                    let layer_name = item.getAttribute("inkscape:label");
+                    if (layer_regex.test(layer_name)) {
+                        layers.push(layer_name);
+                    }
+                }
+            });
+
+            document.querySelector("form[name=plot] input[name=filename]").value = filename;
+
+            let select_menu = document.querySelector("select[name=layer]");
+            var length = select_menu.options.length;
+            for (let i = length - 1; i >= 0; i--) {
+                select_menu.options[i] = null;
+            }
+
+            let opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "All";
+            select_menu.appendChild(opt);
+            layers.forEach((item) => {
+                let opt = document.createElement("option");
+                let layer_number = item.match(/^(\d+)/)[0];
+                opt.value = layer_number;
+                opt.textContent = item;
+                select_menu.appendChild(opt);
+            });
+
+            updatePlotCommand();
+        }
+
+        async function loadAnimatedPreview(filepath, filename) {
+            const previewElement = document.querySelector('#svg-object');
+            previewElement.setAttribute('data-filename', filename);
+
+            if (!window.SimplePlotAnimator) {
+                console.error('SimplePlotAnimator UMD bundle is not available');
+                return;
+            }
+
+            if (!currentAnimator) {
+                currentAnimator = new window.SimplePlotAnimator(previewElement, {
+                    speed: Number(document.querySelector('#speed-slider').value),
+                    onProgress: updatePlaybackProgress,
+                    onComplete: () => {
+                        updatePlaybackProgress({ current: currentAnimator.paths.length, total: currentAnimator.paths.length, percentage: 100 });
+                        setPlaybackButtonState(false);
+                    }
+                });
+            } else {
+                currentAnimator.pause();
+                currentAnimator.onProgress = updatePlaybackProgress;
+                currentAnimator.onComplete = () => {
+                    updatePlaybackProgress({ current: currentAnimator.paths.length, total: currentAnimator.paths.length, percentage: 100 });
+                    setPlaybackButtonState(false);
+                };
+                currentAnimator.setSpeed(Number(document.querySelector('#speed-slider').value));
+            }
+
+            const loaded = await currentAnimator.loadFromURL(filepath);
+            if (!loaded) {
+                return;
+            }
+
+            analyzeLoadedSvg(filename);
+            setPlaybackControlsEnabled(true);
+            currentAnimator.reset();
+            updatePlaybackProgress({ current: 0, total: currentAnimator.paths.length, percentage: 0 });
+            currentAnimator.play();
+            setPlaybackButtonState(true);
         }
 
         document.querySelectorAll("#files a").forEach(item => {
-            item.addEventListener("click", function(event){
+            item.addEventListener("click", async function(event){
+                event.preventDefault();
 
                 // Clear any "selected" list items
                 document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
@@ -616,13 +778,8 @@
                 url.searchParams.set('sketch', filename);
                 window.history.replaceState({}, '', url);
 
-                // Update the Plot command
-                updatePlotCommand();
-
-                // Animate .artwork height after SVG loads
-                animateArtworkHeightOnSVGChange(filepath, filename);
-                event.preventDefault();
-            })
+                await loadAnimatedPreview(filepath, filename);
+            });
         });
 
         function updatePlotCommand() {
@@ -649,8 +806,8 @@
                 command += ` -y "${layer}"`;
             }
 
-            const svgObject = document.getElementById('svg-object').contentDocument;
-            const dimensions = extractSvgDimensions(svgObject);
+            const svgElement = getCurrentSvgElement();
+            const dimensions = extractSvgDimensions(svgElement);
             if (dimensions) {
 
                 // Option 1: Use mm returned by extractSvgDimensions
@@ -676,74 +833,6 @@
 
             document.querySelector("#plot-command").textContent = command;
         }
-
-        // Extract information about the SVG file after it has loaded
-        document.querySelector("#svg-object").addEventListener("load", function() {
-
-            // Load SVG content
-            var svgObject = document.getElementById('svg-object').contentDocument;
-
-            // Extract and display SVG dimensions
-            const dimensions = extractSvgDimensions(svgObject);
-            if (dimensions) {
-                currentSvgDimensions = dimensions;
-                document.querySelector("#svg-dimensions").textContent =
-                    `${dimensions.width.toFixed(1)}mm × ${dimensions.height.toFixed(1)}mm (${formatInches(dimensions.width)}" x ${formatInches(dimensions.height)}")`;
-
-                // Check if it fits the plotter
-                checkSvgFit();
-            } else {
-                currentSvgDimensions = null;
-                document.querySelector("#svg-dimensions").textContent = "Unable to determine";
-                const fitElement = document.querySelector("#plotter-fit");
-                fitElement.textContent = "-";
-                fitElement.className = "";
-            }
-
-            // var parser = new DOMParser();
-            // var doc = parser.parseFromString(svgObject, "image/svg+xml");
-
-            // Look for group (<g>) tags with the "inkscape:label" that denotes
-            // an AxiDraw layer
-            var groups = svgObject.querySelectorAll('g');
-            let layers = [];
-            let layer_regex = new RegExp(/^\d/);
-            groups.forEach((item) => {
-                if (item.hasAttribute("inkscape:label")) {
-                    let layer_name = item.getAttribute("inkscape:label");
-                    if (layer_regex.test(layer_name)) {
-                        layers.push(layer_name);
-                    }
-                }
-            });
-
-            // Set filename on hidden form element
-            document.querySelector("form[name=plot] input[name=filename]").value = this.getAttribute('data-filename');
-
-            // Build a Form menu to select a layer
-            let select_menu = document.querySelector("select[name=layer]")
-
-            // Clear any existing values from the option menu
-            var length = select_menu.options.length;
-            for (i = length-1; i >= 0; i--) {
-                select_menu.options[i] = null;
-            }
-
-            // Set the options based on the current SVG's layers
-            let opt = document.createElement("option");
-            opt.value = "";
-            opt.textContent = "All";
-            select_menu.appendChild(opt);
-            layers.forEach((item) => {
-                let opt = document.createElement("option");
-                let layer_number = item.match(/^(\d+)/)[0];
-                opt.value = layer_number;
-                opt.textContent = item;
-                select_menu.appendChild(opt);
-            });
-
-            updatePlotCommand();
-        });
 
         // Call updatePlotCommand whenever a plot option changes
         document.querySelectorAll('form[name=plot] input, form[name=plot] select').forEach(elem => {
@@ -789,6 +878,7 @@
         window.addEventListener("load", function() {
             initializeThemeToggle();
             initializeUploadDropZone();
+            initializePlaybackControls();
             const urlParams = new URLSearchParams(window.location.search);
             let sketchParam = urlParams.get('sketch');
             let found = false;
@@ -799,7 +889,7 @@
                     let filename = sketchLink.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
                     setSelectedSketch(filename);
-                    animateArtworkHeightOnSVGChange(filepath, filename);
+                    loadAnimatedPreview(filepath, filename);
                     // Highlight the selected item
                     sketchLink.parentElement.classList.add('selected');
                     found = true;
@@ -812,7 +902,7 @@
                     let filename = first_sketch.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
                     setSelectedSketch(filename);
-                    animateArtworkHeightOnSVGChange(filepath, filename);
+                    loadAnimatedPreview(filepath, filename);
                     first_sketch.parentElement.classList.add('selected');
                 }
             }
