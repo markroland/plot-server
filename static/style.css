@@ -324,6 +324,63 @@ button:disabled {
   min-height: 520px;
 }
 
+.artwork-frame.is-loading .artwork {
+  filter: saturate(0.8) blur(1px);
+}
+
+.preview-loading {
+  position: absolute;
+  inset: clamp(1rem, 2vw, 1.75rem);
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  gap: 0.9rem;
+  padding: 1.25rem;
+  border: 1px solid var(--frame-border);
+  border-radius: 1.1rem;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.preview-loading[hidden] {
+  display: none;
+}
+
+.preview-loading__content {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.preview-loading__content strong {
+  font-size: 0.98rem;
+}
+
+.preview-loading__content span {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.preview-loading__spinner {
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 3px solid color-mix(in srgb, var(--action) 18%, var(--line));
+  border-top-color: var(--action);
+  border-radius: 999px;
+  animation: preview-loading-spin 0.85s linear infinite;
+}
+
+@keyframes preview-loading-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 div.artwork {
   display: flex;
   align-items: center;

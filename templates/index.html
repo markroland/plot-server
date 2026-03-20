@@ -20,7 +20,7 @@
     <link rel="mask-icon" href="/static/images/safari-pinned-tab.svg" color="#000000">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta id="theme-color-meta" name="theme-color" content="#d8d1c7">
-    <script src="/static/js/simple-plot-animator.umd.js"></script>
+    <script src="/static/js/simple-plot-animator-0.2.0.umd.js"></script>
 </head>
 <body>
     <div class="app-shell">
@@ -105,6 +105,13 @@
                 </div>
 
                 <div class="artwork-frame">
+                    <div id="preview-loading" class="preview-loading" aria-live="polite" hidden>
+                        <div class="preview-loading__spinner" aria-hidden="true"></div>
+                        <div class="preview-loading__content">
+                            <strong id="preview-loading-title">Loading preview</strong>
+                            <span id="preview-loading-message">Preparing SVG...</span>
+                        </div>
+                    </div>
                     <div class="artwork">
                         <div id="svg-object"></div>
                     </div>
@@ -119,8 +126,8 @@
                             <span id="progress-text">0 / 0</span>
                         </div>
                         <div class="speed-control">
-                            <label for="speed-slider">Frame delay</label>
-                            <input type="range" id="speed-slider" min="1" max="100" value="3" disabled>
+                            <label for="speed-slider">Frame Delay</label>
+                            <input type="range" id="speed-slider" min="1" max="500" value="3" disabled>
                             <span id="speed-display">3 ms</span>
                         </div>
                     </div>
@@ -233,6 +240,7 @@
         let currentSvgDimensions = null;
         let currentAnimator = null;
         let isPlaybackActive = false;
+        let previewLoadRequestId = 0;
 
         function setText(selector, value) {
             const element = document.querySelector(selector);
@@ -249,6 +257,44 @@
             return document.querySelector('#svg-object svg');
         }
 
+        function getSimplePlotAnimatorClass() {
+            const animatorModule = window.SimplePlotAnimator;
+
+            if (typeof animatorModule === 'function') {
+                return animatorModule;
+            }
+
+            if (animatorModule && typeof animatorModule.SimplePlotAnimator === 'function') {
+                return animatorModule.SimplePlotAnimator;
+            }
+
+            if (animatorModule && typeof animatorModule.default === 'function') {
+                return animatorModule.default;
+            }
+
+            return null;
+        }
+
+        function waitForBrowserFrame() {
+            return new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    setTimeout(resolve, 0);
+                });
+            });
+        }
+
+        function setPreviewLoading(isVisible, message = 'Preparing SVG...') {
+            const loadingElement = document.querySelector('#preview-loading');
+            if (!loadingElement) {
+                return;
+            }
+
+            document.querySelector('#preview-loading-message').textContent = message;
+            loadingElement.hidden = !isVisible;
+            loadingElement.classList.toggle('is-visible', isVisible);
+            document.querySelector('.artwork-frame').classList.toggle('is-loading', isVisible);
+        }
+
         function setPlaybackButtonState(isPlaying) {
             isPlaybackActive = isPlaying;
             setText('#play-pause-btn', isPlaying ? 'Pause' : 'Play');
@@ -256,7 +302,7 @@
 
         function updatePlaybackProgress(progress) {
             const current = Math.min(progress.current, progress.total);
-            setText('#progress-text', `${current} / ${progress.total}`);
+            setText('#progress-text', `${Number(current || 0).toLocaleString()} / ${Number(progress.total || 0).toLocaleString()}`);
 
             const percentage = progress.total > 0 ? Math.round((current / progress.total) * 100) : 0;
             document.querySelector('#progress-fill').style.width = `${percentage}%`;
@@ -271,7 +317,7 @@
         function initializePlaybackControls() {
             const speedSlider = document.querySelector('#speed-slider');
 
-            document.querySelector('#play-pause-btn').addEventListener('click', function() {
+            document.querySelector('#play-pause-btn').addEventListener('click', async function() {
                 if (!currentAnimator) {
                     return;
                 }
@@ -280,8 +326,17 @@
                     currentAnimator.pause();
                     setPlaybackButtonState(false);
                 } else {
-                    currentAnimator.play();
-                    setPlaybackButtonState(true);
+                    try {
+                        if (!currentAnimator.animationPrepared || currentAnimator.currentPathIndex >= currentAnimator.paths.length) {
+                            setPreviewLoading(true, 'Preparing animation...');
+                            await waitForBrowserFrame();
+                        }
+
+                        await currentAnimator.play();
+                        setPlaybackButtonState(true);
+                    } finally {
+                        setPreviewLoading(false);
+                    }
                 }
             });
 
@@ -719,43 +774,62 @@
 
         async function loadAnimatedPreview(filepath, filename) {
             const previewElement = document.querySelector('#svg-object');
+            const loadRequestId = ++previewLoadRequestId;
             previewElement.setAttribute('data-filename', filename);
-
-            if (!window.SimplePlotAnimator) {
-                console.error('SimplePlotAnimator UMD bundle is not available');
-                return;
+            if (currentAnimator) {
+                currentAnimator.pause();
             }
+            setPlaybackControlsEnabled(false);
+            setPlaybackButtonState(false);
+            updatePlaybackProgress({ current: 0, total: 0, percentage: 0 });
+            setPreviewLoading(true, 'Loading SVG...');
+            await waitForBrowserFrame();
 
-            if (!currentAnimator) {
-                currentAnimator = new window.SimplePlotAnimator(previewElement, {
-                    speed: Number(document.querySelector('#speed-slider').value),
-                    onProgress: updatePlaybackProgress,
-                    onComplete: () => {
+            try {
+                const SimplePlotAnimatorClass = getSimplePlotAnimatorClass();
+                if (!SimplePlotAnimatorClass) {
+                    throw new Error('SimplePlotAnimator UMD bundle is not available');
+                }
+
+                if (!currentAnimator) {
+                    currentAnimator = new SimplePlotAnimatorClass(previewElement, {
+                        speed: Number(document.querySelector('#speed-slider').value),
+                        onProgress: updatePlaybackProgress,
+                        onComplete: () => {
+                            updatePlaybackProgress({ current: currentAnimator.paths.length, total: currentAnimator.paths.length, percentage: 100 });
+                            setPlaybackButtonState(false);
+                        }
+                    });
+                } else {
+                    currentAnimator.pause();
+                    currentAnimator.onProgress = updatePlaybackProgress;
+                    currentAnimator.onComplete = () => {
                         updatePlaybackProgress({ current: currentAnimator.paths.length, total: currentAnimator.paths.length, percentage: 100 });
                         setPlaybackButtonState(false);
-                    }
-                });
-            } else {
-                currentAnimator.pause();
-                currentAnimator.onProgress = updatePlaybackProgress;
-                currentAnimator.onComplete = () => {
-                    updatePlaybackProgress({ current: currentAnimator.paths.length, total: currentAnimator.paths.length, percentage: 100 });
-                    setPlaybackButtonState(false);
-                };
-                currentAnimator.setSpeed(Number(document.querySelector('#speed-slider').value));
-            }
+                    };
+                    currentAnimator.setSpeed(Number(document.querySelector('#speed-slider').value));
+                }
 
-            const loaded = await currentAnimator.loadFromURL(filepath);
-            if (!loaded) {
-                return;
-            }
+                setPreviewLoading(true, 'Rendering preview...');
+                const loaded = await currentAnimator.loadFromURL(filepath);
+                if (!loaded || loadRequestId !== previewLoadRequestId) {
+                    return;
+                }
 
-            analyzeLoadedSvg(filename);
-            setPlaybackControlsEnabled(true);
-            currentAnimator.reset();
-            updatePlaybackProgress({ current: 0, total: currentAnimator.paths.length, percentage: 0 });
-            currentAnimator.play();
-            setPlaybackButtonState(true);
+                setPreviewLoading(true, 'Analyzing layers...');
+                await waitForBrowserFrame();
+                analyzeLoadedSvg(filename);
+                setPlaybackControlsEnabled(true);
+                updatePlaybackProgress({ current: 0, total: currentAnimator.paths.length, percentage: 0 });
+                setPlaybackButtonState(false);
+            } catch (error) {
+                console.error('Failed to load animated preview:', error);
+                previewElement.innerHTML = '<div class="plot-animator-error">Error loading preview</div>';
+            } finally {
+                if (loadRequestId === previewLoadRequestId) {
+                    setPreviewLoading(false);
+                }
+            }
         }
 
         document.querySelectorAll("#files a").forEach(item => {
