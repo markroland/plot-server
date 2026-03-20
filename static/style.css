@@ -412,6 +412,20 @@ div.artwork {
   box-shadow: none;
 }
 
+html[data-theme="dark"] #svg-object svg {
+  background: #151210;
+}
+
+html[data-theme="dark"] #svg-object svg path,
+html[data-theme="dark"] #svg-object svg polyline,
+html[data-theme="dark"] #svg-object svg polygon,
+html[data-theme="dark"] #svg-object svg line,
+html[data-theme="dark"] #svg-object svg circle,
+html[data-theme="dark"] #svg-object svg ellipse,
+html[data-theme="dark"] #svg-object svg rect {
+  stroke: var(--text) !important;
+}
+
 .svg-info-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
