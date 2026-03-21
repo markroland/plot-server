@@ -773,10 +773,10 @@ ol#files li.selected {
 }
 
 ol#files li a.file-link {
-  display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr);
-  gap: 0.75rem;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  align-items: stretch;
   min-width: 0;
   padding: 0.55rem;
   color: inherit;
@@ -791,14 +791,15 @@ ol#files li a.file-link:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  max-width: 240px;
+  width: min(100%, 120px);
+  max-width: 120px;
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid var(--frame-border);
   border-radius: 0.75rem;
   background: var(--panel-strong);
   box-shadow: var(--shadow);
+  align-self: center;
 }
 
 .file-thumb {
@@ -838,6 +839,7 @@ ol#files li a.file-link:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
 .fit-good {
