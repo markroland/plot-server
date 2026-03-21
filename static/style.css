@@ -365,10 +365,12 @@ button:disabled {
   position: relative;
   padding: clamp(1rem, 2vw, 1.75rem);
   border-radius: 1.25rem;
+  /*
   background:
     linear-gradient(135deg, var(--frame-start), var(--frame-end)),
     repeating-linear-gradient(0deg, var(--frame-pattern), var(--frame-pattern) 1px, transparent 1px, transparent 18px);
   border: 1px solid var(--frame-border);
+  //*/
   min-height: 520px;
 }
 
