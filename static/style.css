@@ -744,7 +744,7 @@ div.file_list {
   margin-top: 0.65rem;
   width: 100%;
   min-width: 0;
-  max-height: calc((15 * 2.1rem) + 1.2rem);
+  max-height: min(60vh, 34rem);
   overflow-y: auto;
   scrollbar-gutter: stable;
   border: 1px solid var(--file-list-border);
@@ -753,14 +753,15 @@ div.file_list {
 }
 
 ol#files {
+  list-style: none;
   margin: 0;
   width: 100%;
-  padding: 0.6rem 0.6rem 0.6rem 2rem;
+  padding: 0.6rem;
 }
 
 ol#files li {
-  margin: 0.12rem 0;
-  padding: 0.45rem 0.5rem;
+  margin: 0.4rem 0;
+  padding: 0;
   border-radius: 0.6rem;
   font-size: 0.92rem;
   line-height: 1.2rem;
@@ -771,17 +772,72 @@ ol#files li.selected {
   background: var(--selected-item-bg);
 }
 
-ol#files li a {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+ol#files li a.file-link {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.55rem;
   color: inherit;
   text-decoration: none;
 }
 
-ol#files li a:hover {
+ol#files li a.file-link:hover {
   text-decoration: underline;
+}
+
+.file-link__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--frame-border);
+  border-radius: 0.75rem;
+  background: var(--panel-strong);
+  box-shadow: var(--shadow);
+}
+
+.file-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.file-thumb-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0.65rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--panel-strong) 88%, transparent), color-mix(in srgb, var(--panel) 92%, transparent));
+}
+
+.file-link--no-thumbnail .file-thumb {
+  display: none;
+}
+
+.file-link--no-thumbnail .file-thumb-fallback {
+  display: flex;
+}
+
+.file-link__label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fit-good {

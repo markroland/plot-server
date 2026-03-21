@@ -89,7 +89,15 @@
                     <div class="file_list">
                         <ol id="files">
                         {% for f in files %}
-                            <li><a href="/static/uploads/{{f}}" data-filename="{{f}}">{{f}}</a></li>
+                            <li data-filename="{{f.filename}}">
+                                <a class="file-link" href="{{f.svg_url}}" data-filename="{{f.filename}}">
+                                    <span class="file-link__preview" aria-hidden="true">
+                                        <img class="file-thumb" src="{{f.thumbnail_url}}" alt="" loading="lazy" decoding="async">
+                                        <span class="file-thumb-fallback">SVG</span>
+                                    </span>
+                                    <span class="file-link__label">{{f.filename}}</span>
+                                </a>
+                            </li>
                         {% endfor %}
                         </ol>
                     </div>
@@ -836,6 +844,25 @@
             }
         }
 
+        function markThumbnailUnavailable(imageElement) {
+            const fileLink = imageElement.closest('.file-link');
+            if (fileLink) {
+                fileLink.classList.add('file-link--no-thumbnail');
+            }
+        }
+
+        function initializeFileThumbnails() {
+            document.querySelectorAll('.file-thumb').forEach((imageElement) => {
+                imageElement.addEventListener('error', function() {
+                    markThumbnailUnavailable(imageElement);
+                });
+
+                if (imageElement.complete && imageElement.naturalWidth === 0) {
+                    markThumbnailUnavailable(imageElement);
+                }
+            });
+        }
+
         document.querySelectorAll("#files a").forEach(item => {
             item.addEventListener("click", async function(event){
                 event.preventDefault();
@@ -844,7 +871,7 @@
                 document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
 
                 // Apply class to highlight clicked item
-                event.target.parentElement.classList.add('selected');
+                event.currentTarget.closest('li').classList.add('selected');
 
                 // Parse file request
                 let filepath = this.getAttribute("href");
@@ -957,6 +984,7 @@
             initializeThemeToggle();
             initializeUploadDropZone();
             initializePlaybackControls();
+            initializeFileThumbnails();
             const urlParams = new URLSearchParams(window.location.search);
             let sketchParam = urlParams.get('sketch');
             let found = false;
@@ -990,7 +1018,7 @@
         document.querySelector('#library-search').addEventListener('input', function(event) {
             const query = event.target.value.trim().toLowerCase();
             document.querySelectorAll('#files li').forEach((item) => {
-                const filename = item.textContent.trim().toLowerCase();
+                const filename = item.getAttribute('data-filename').toLowerCase();
                 item.style.display = filename.includes(query) ? '' : 'none';
             });
         });
