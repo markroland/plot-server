@@ -783,7 +783,7 @@
         function checkSvgFit() {
             if (!currentSvgDimensions || !currentPlotterData?.config?.x_travel || !currentPlotterData?.config?.y_travel) {
                 const fitElement = document.querySelector("#plotter-fit");
-                fitElement.textContent = "Fit: -";
+                fitElement.textContent = "Plotter Fit: NA";
                 fitElement.className = "";
                 return;
             }
@@ -802,7 +802,7 @@
             let fitClass = "";
 
             if (fits) {
-                fitText = "Fit: Yes";
+                fitText = "Plotter Fit: Yes";
                 fitClass = "fit-good";
             } else {
                 const issues = [];
