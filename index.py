@@ -7,6 +7,9 @@
 #  nohup python index.py > /dev/null 2>&1 &
 
 from dotenv import load_dotenv
+from contextlib import redirect_stderr, redirect_stdout
+import io
+import json
 import threading
 from pyaxidraw import axidraw
 from flask import Flask, request, Response, render_template
@@ -303,6 +306,59 @@ def plot(filepath, layer=0):
     ad.options.manual_cmd = "disable_xy"
     ad.plot_run()
 
+def preview_plot(filepath):
+    output_buffer = io.StringIO()
+    previous_preview = getattr(ad.options, 'preview', False)
+    previous_report_time = getattr(ad.options, 'report_time', False)
+
+    try:
+        with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
+            ad.plot_setup(filepath)
+            ad.options.preview = True
+            ad.options.report_time = True
+            ad.plot_run()
+    finally:
+        ad.options.preview = previous_preview
+        ad.options.report_time = previous_report_time
+
+    output = output_buffer.getvalue().strip()
+    if not output:
+        output = 'Preview completed with no output.'
+
+    return output
+
+
+def parse_duration_to_seconds(duration_text):
+    parts = [int(part) for part in duration_text.split(':')]
+
+    if len(parts) == 3:
+        hours, minutes, seconds = parts
+        return (hours * 3600) + (minutes * 60) + seconds
+
+    if len(parts) == 2:
+        minutes, seconds = parts
+        return (minutes * 60) + seconds
+
+    if len(parts) == 1:
+        return parts[0]
+
+    raise ValueError(f'Unsupported duration format: {duration_text}')
+
+
+def parse_preview_output(preview_output):
+    duration_match = re.search(r'Estimated print time:\s*([0-9:]+)', preview_output)
+    path_match = re.search(r'Length of path to draw:\s*([0-9]+(?:\.[0-9]+)?)\s*m', preview_output)
+    travel_match = re.search(r'Pen-up travel distance:\s*([0-9]+(?:\.[0-9]+)?)\s*m', preview_output)
+
+    if not duration_match or not path_match or not travel_match:
+        raise ValueError('Could not parse preview output')
+
+    return {
+        'plot_duration': parse_duration_to_seconds(duration_match.group(1)),
+        'plot_path': float(path_match.group(1)),
+        'plot_travel': float(travel_match.group(1)),
+    }
+
 # Define route for a plot request
 @app.route('/plot/<file>', methods=['GET', 'POST'])
 def plot_request(file):
@@ -322,6 +378,11 @@ def plot_request(file):
         # other incoming requests until the plotter is done
         if sem.acquire(True, 0.1):
             try:
+                if request.args.get("preview", "").lower() == "true":
+                    preview_output = preview_plot(filepath)
+                    preview_data = parse_preview_output(preview_output)
+                    return Response(json.dumps(preview_data), mimetype='application/json')
+
                 # Determine requested layer
                 layer = request.args.get("layer", default=0, type=int)
                 plot(filepath, layer)
@@ -584,7 +645,6 @@ def status():
 @app.route('/status.json')
 def status_json():
     """JSON status endpoint - returns detailed machine info"""
-    import json
     status_data = get_plotter_status()
 
     response = Response(json.dumps(status_data), mimetype='application/json')
