@@ -595,6 +595,9 @@
                             });
                     }, 5000);
                 }
+            } else if (data.status === 'connected') {
+                color = '#ff6600'; // orange
+                statusText = 'Connected (Check Power)';
             } else if (data.status === 'on') {
                 statusText = 'On';
                 color = '#2ecc40'; // green
@@ -604,7 +607,7 @@
                     busyPollingInterval = null;
                 }
             } else if (data.status === 'off') {
-                statusText = 'Off';
+                statusText = 'Disconnected';
                 color = '#ff4136'; // red
                 // Stop polling if plotter is off
                 if (busyPollingInterval) {
@@ -612,6 +615,7 @@
                     busyPollingInterval = null;
                 }
             }
+
             setText("#plotter-status-chip", statusText);
             document.querySelector("#plotter-status-chip").style.color = color;
 
