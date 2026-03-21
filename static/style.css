@@ -387,7 +387,6 @@ div.artwork {
   justify-content: center;
   min-height: 100%;
   transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
   height: auto;
 }
 
@@ -406,10 +405,18 @@ div.artwork {
 }
 
 #svg-object {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 700px;
   padding: 0;
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+#svg-object svg {
+  max-height: 700px;
 }
 
 html[data-theme="dark"] #svg-object svg {
