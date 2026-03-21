@@ -519,11 +519,14 @@ html[data-theme="dark"] #svg-object svg rect {
   min-width: 0;
 }
 
-.upload-card,
 .library-list {
   padding: 0.85rem;
   min-width: 0;
   overflow: hidden;
+}
+
+.library-upload-form {
+  margin-top: 0.35rem;
 }
 
 .drop-zone {
@@ -923,7 +926,6 @@ ol#files li a.file-link:hover {
 
   .preview-panel,
   .plot-setup-card,
-  .upload-card,
   .library-list {
     padding: 1rem;
     border-radius: 1.1rem;

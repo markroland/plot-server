@@ -48,14 +48,15 @@
 
         <main class="workspace">
             <aside class="library-rail">
-                <section class="card upload-card">
+                <section class="library-list card">
                     <div class="panel-heading compact">
                         <div>
-                            <p class="eyebrow">Add New Plots</p>
-                            <h2>Upload</h2>
+                            <p class="eyebrow">Plot Library</p>
+                            <h2>Files</h2>
                         </div>
                     </div>
-                    <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data" class="upload-form upload-form--stacked">
+
+                    <form name="upload-plot" action="/plot/upload" method="post" enctype="multipart/form-data" class="upload-form upload-form--stacked library-upload-form">
                         <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Upload SVG by dragging and dropping or browsing">
                             <div class="drop-zone-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" focusable="false">
@@ -69,15 +70,6 @@
                         <input type="file" id="file" name="file" accept=".svg,image/svg+xml" required hidden>
                         <div id="upload-status" class="upload-status" aria-live="polite"></div>
                     </form>
-                </section>
-
-                <section class="library-list card">
-                    <div class="panel-heading compact">
-                        <div>
-                            <p class="eyebrow">Plot Library</p>
-                            <h2>Files</h2>
-                        </div>
-                    </div>
 
                     <div class="library-toolbar">
                         <label class="search-field" for="library-search">
