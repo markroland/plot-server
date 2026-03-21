@@ -140,10 +140,27 @@
                     <div class="info-tile">
                         <span class="info-tile__label">SVG Dimensions</span>
                         <strong id="svg-dimensions">-</strong>
+                        <span id="plotter-fit" class="info-tile__meta">Fit: -</span>
                     </div>
-                    <div class="info-tile">
-                        <span class="info-tile__label">Plotter Fit</span>
-                        <strong id="plotter-fit">-</strong>
+                    <div class="info-tile info-tile--preview">
+                        <span class="info-tile__label">Plot Preview</span>
+                        <div class="preview-metrics">
+                            <div class="preview-metric-row">
+                                <span class="preview-metric__label">Duration</span>
+                                <span class="preview-metric__leader" aria-hidden="true"></span>
+                                <span id="preview-duration" class="preview-metric__value">-</span>
+                            </div>
+                            <div class="preview-metric-row">
+                                <span class="preview-metric__label">Path</span>
+                                <span class="preview-metric__leader" aria-hidden="true"></span>
+                                <span id="preview-path" class="preview-metric__value">-</span>
+                            </div>
+                            <div class="preview-metric-row">
+                                <span class="preview-metric__label">Travel</span>
+                                <span class="preview-metric__leader" aria-hidden="true"></span>
+                                <span id="preview-travel" class="preview-metric__value">-</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -238,6 +255,7 @@
         // Global variables to store plotter and SVG data
         let currentPlotterData = null;
         let currentSvgDimensions = null;
+        let currentPreviewEstimate = null;
         let currentAnimator = null;
         let isPlaybackActive = false;
         let previewLoadRequestId = 0;
@@ -251,6 +269,13 @@
 
         function setSelectedSketch(filename) {
             setText("#selected-sketch-name", `File: ${filename || "No sketch selected"}`);
+        }
+
+        function buildPlotRequestPath(filename, queryParams = {}) {
+            const requestPath = `/plot/${filename.split('/').map(encodeURIComponent).join('/')}`;
+            const params = new URLSearchParams(queryParams);
+            const queryString = params.toString();
+            return queryString ? `${requestPath}?${queryString}` : requestPath;
         }
 
         function getCurrentSvgElement() {
@@ -312,6 +337,91 @@
             document.querySelector('#play-pause-btn').disabled = !enabled;
             document.querySelector('#reset-btn').disabled = !enabled;
             document.querySelector('#speed-slider').disabled = !enabled;
+        }
+
+        function formatDurationFromSeconds(totalSeconds) {
+            if (!Number.isFinite(totalSeconds)) {
+                return '-';
+            }
+
+            if (totalSeconds < 60) {
+                return `${Math.round(totalSeconds)} sec`;
+            }
+
+            const roundedMinutes = Math.round(totalSeconds / 60);
+            const hours = Math.floor(roundedMinutes / 60);
+            const minutes = roundedMinutes % 60;
+
+            const parts = [];
+
+            if (hours > 0) {
+                parts.push(`${hours} hr`);
+            }
+
+            if (minutes > 0 || hours === 0) {
+                parts.push(`${minutes} min`);
+            }
+
+            return parts.join(' ');
+        }
+
+        function formatMeters(value) {
+            if (!Number.isFinite(value)) {
+                return '-';
+            }
+
+            return `${value.toFixed(2)} m`;
+        }
+
+        function resetPreviewEstimate(message = 'Loading') {
+            currentPreviewEstimate = null;
+            const durationElement = document.querySelector('#preview-duration');
+            durationElement.textContent = message;
+            durationElement.className = 'preview-metric__value';
+            setText('#preview-path', message);
+            setText('#preview-travel', message);
+        }
+
+        function renderPreviewEstimate(data) {
+            currentPreviewEstimate = data;
+            const durationElement = document.querySelector('#preview-duration');
+            durationElement.textContent = formatDurationFromSeconds(Number(data.plot_duration));
+            durationElement.className = 'preview-metric__value';
+            setText('#preview-path', formatMeters(Number(data.plot_path)));
+            setText('#preview-travel', formatMeters(Number(data.plot_travel)));
+        }
+
+        async function loadPreviewEstimate(filename, loadRequestId) {
+            resetPreviewEstimate('Loading');
+            document.querySelector('#preview-duration').className = 'preview-metric__value info-tile__value--pending';
+            document.querySelector('#preview-path').className = 'preview-metric__value info-tile__value--pending';
+            document.querySelector('#preview-travel').className = 'preview-metric__value info-tile__value--pending';
+
+            try {
+                const response = await fetch(buildPlotRequestPath(filename, { preview: 'true' }));
+                if (loadRequestId !== previewLoadRequestId) {
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Preview request failed with status ${response.status}`);
+                }
+
+                const previewData = await response.json();
+                if (loadRequestId !== previewLoadRequestId) {
+                    return;
+                }
+
+                renderPreviewEstimate(previewData);
+            } catch (error) {
+                console.error('Failed to load preview estimate:', error);
+                if (loadRequestId !== previewLoadRequestId) {
+                    return;
+                }
+
+                resetPreviewEstimate('Unavailable');
+                document.querySelector('#preview-duration').className = 'preview-metric__value fit-bad';
+            }
         }
 
         function initializePlaybackControls() {
@@ -673,7 +783,7 @@
         function checkSvgFit() {
             if (!currentSvgDimensions || !currentPlotterData?.config?.x_travel || !currentPlotterData?.config?.y_travel) {
                 const fitElement = document.querySelector("#plotter-fit");
-                fitElement.textContent = "-";
+                fitElement.textContent = "Fit: -";
                 fitElement.className = "";
                 return;
             }
@@ -692,13 +802,13 @@
             let fitClass = "";
 
             if (fits) {
-                fitText = "✓ Fits";
+                fitText = "Fit: Yes";
                 fitClass = "fit-good";
             } else {
                 const issues = [];
                 if (!fitsWidth) issues.push(`width: ${svgWidth.toFixed(1)}mm > ${plotterWidth.toFixed(1)}mm`);
                 if (!fitsHeight) issues.push(`height: ${svgHeight.toFixed(1)}mm > ${plotterHeight.toFixed(1)}mm`);
-                fitText = `✗ Too large (${issues.join(', ')})`;
+                fitText = `Fit: No, ${issues.join(', ')}`;
                 fitClass = "fit-bad";
             }
 
@@ -722,7 +832,7 @@
                 currentSvgDimensions = null;
                 document.querySelector("#svg-dimensions").textContent = "Unable to determine";
                 const fitElement = document.querySelector("#plotter-fit");
-                fitElement.textContent = "-";
+                fitElement.textContent = "Fit: -";
                 fitElement.className = "";
                 return;
             }
@@ -737,7 +847,7 @@
                 currentSvgDimensions = null;
                 document.querySelector("#svg-dimensions").textContent = "Unable to determine";
                 const fitElement = document.querySelector("#plotter-fit");
-                fitElement.textContent = "-";
+                fitElement.textContent = "Fit: -";
                 fitElement.className = "";
             }
 
@@ -780,6 +890,7 @@
             const previewElement = document.querySelector('#svg-object');
             const loadRequestId = ++previewLoadRequestId;
             previewElement.setAttribute('data-filename', filename);
+            resetPreviewEstimate();
             if (currentAnimator) {
                 currentAnimator.pause();
             }
@@ -787,6 +898,7 @@
             setPlaybackButtonState(false);
             updatePlaybackProgress({ current: 0, total: 0, percentage: 0 });
             setPreviewLoading(true, 'Loading SVG...');
+            loadPreviewEstimate(filename, loadRequestId);
             await waitForBrowserFrame();
 
             try {
@@ -1017,9 +1129,9 @@
 
         // Send an API request to start a plot
         function send_plot_request(filename, layer = null){
-            let request = '/plot/' + filename;
+            let request = buildPlotRequestPath(filename);
             if (layer != null) {
-                request += "?layer=" + layer;
+                request += `?layer=${encodeURIComponent(layer)}`;
             }
             var xhr = new XMLHttpRequest();
             xhr.open('GET', request);
