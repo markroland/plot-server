@@ -74,7 +74,7 @@
                     <div class="library-toolbar">
                         <label class="search-field" for="library-search">
                             <span>Search</span>
-                            <input type="search" id="library-search" placeholder="Filter plots by filename">
+                            <input type="search" id="library-search" placeholder="Filter by filename">
                         </label>
                     </div>
 
@@ -267,8 +267,8 @@
             }
         }
 
-        function setSelectedSketch(filename) {
-            setText("#selected-sketch-name", `File: ${filename || "No sketch selected"}`);
+        function setSelectedPlot(filename) {
+            setText("#selected-sketch-name", `File: ${filename || "No plot selected"}`);
         }
 
         function buildPlotRequestPath(filename, queryParams = {}) {
@@ -552,7 +552,7 @@
                 if (xhr.status === 200) {
                     setUploadStatus('Upload complete');
                     const url = new URL(window.location);
-                    url.searchParams.set('sketch', file.name);
+                    url.searchParams.set('plot', file.name);
                     window.location.href = url.toString();
                 } else {
                     const message = xhr.responseText || 'Upload failed';
@@ -980,11 +980,12 @@
                 // Parse file request
                 let filepath = this.getAttribute("href");
                 let filename = this.getAttribute("data-filename");
-                setSelectedSketch(filename);
 
-                // Update the URL with ?sketch={sketchname} (no reload)
+                setSelectedPlot(filename);
+
+                // Update the URL with ?plot={plotname} (no reload)
                 const url = new URL(window.location);
-                url.searchParams.set('sketch', filename);
+                url.searchParams.set('plot', filename);
                 window.history.replaceState({}, '', url);
 
                 await loadAnimatedPreview(filepath, filename);
@@ -1083,37 +1084,37 @@
             event.preventDefault();
         });
 
-        // On page load, check for ?sketch= param and load that sketch, else load the first
+        // On page load, check for ?plot= param and load that plot, else load the first
         window.addEventListener("load", function() {
             initializeThemeToggle();
             initializeUploadDropZone();
             initializePlaybackControls();
             initializeFileThumbnails();
             const urlParams = new URLSearchParams(window.location.search);
-            let sketchParam = urlParams.get('sketch');
+            let plotParam = urlParams.get('plot');
             let found = false;
-            if (sketchParam) {
-                // Try to find the matching sketch in the list
-                let sketchLink = Array.from(document.querySelectorAll('ol#files li a')).find(a => a.getAttribute('data-filename') === sketchParam);
-                if (sketchLink) {
-                    let filename = sketchLink.getAttribute('data-filename');
+            if (plotParam) {
+                // Try to find the matching plot in the list
+                let plotLink = Array.from(document.querySelectorAll('ol#files li a')).find(a => a.getAttribute('data-filename') === plotParam);
+                if (plotLink) {
+                    let filename = plotLink.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
-                    setSelectedSketch(filename);
+                    setSelectedPlot(filename);
                     loadAnimatedPreview(filepath, filename);
                     // Highlight the selected item
-                    sketchLink.parentElement.classList.add('selected');
+                    plotLink.parentElement.classList.add('selected');
                     found = true;
                 }
             }
             if (!found) {
-                // Fallback: load the first sketch
-                let first_sketch = document.querySelector('ol#files li a');
-                if (first_sketch) {
-                    let filename = first_sketch.getAttribute('data-filename');
+                // Fallback: load the first plot
+                let first_plot = document.querySelector('ol#files li a');
+                if (first_plot) {
+                    let filename = first_plot.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
-                    setSelectedSketch(filename);
+                    setSelectedPlot(filename);
                     loadAnimatedPreview(filepath, filename);
-                    first_sketch.parentElement.classList.add('selected');
+                    first_plot.parentElement.classList.add('selected');
                 }
             }
             updatePlotCommand();
