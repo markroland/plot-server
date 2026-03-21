@@ -118,6 +118,7 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  font-size: 18px;
   color: var(--text);
 }
 
@@ -166,7 +167,7 @@ button:disabled {
   width: 100%;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 6.5rem 1rem calc(var(--footer-height) + 1.5rem);
+  padding: 7.5rem 1rem calc(var(--footer-height) + 1.5rem);
   display: flex;
   flex-direction: column;
 }
@@ -212,7 +213,7 @@ button:disabled {
 }
 
 .theme-toggle span {
-  font-size: 0.82rem;
+  font-size: 0.94rem;
   font-weight: 600;
 }
 
@@ -259,14 +260,14 @@ button:disabled {
 
 .status-chip__label,
 .info-tile__label {
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .info-tile__meta {
-  font-size: 0.84rem;
+  font-size: 0.96rem;
   color: var(--muted);
   line-height: 1.4;
 }
@@ -286,7 +287,7 @@ button:disabled {
   grid-template-columns: auto minmax(1.5rem, 1fr) auto;
   align-items: baseline;
   column-gap: 0.45rem;
-  font-size: 0.88rem;
+  font-size: 1rem;
 }
 
 .preview-metric__label {
@@ -405,7 +406,7 @@ button:disabled {
 }
 
 .preview-loading__content span {
-  font-size: 0.86rem;
+  font-size: 0.98rem;
   color: var(--muted);
 }
 
@@ -510,7 +511,7 @@ html[data-theme="dark"] #svg-object svg rect {
 
 .progress-info {
   min-width: 4.5rem;
-  font-size: 0.9rem;
+  font-size: 1.02rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -524,7 +525,7 @@ html[data-theme="dark"] #svg-object svg rect {
 }
 
 .speed-control label {
-  font-size: 0.82rem;
+  font-size: 0.94rem;
   font-weight: 600;
   color: var(--muted);
   white-space: nowrap;
@@ -567,7 +568,7 @@ html[data-theme="dark"] #svg-object svg rect {
 }
 
 .library-list {
-  padding: 0.85rem;
+  padding: 1.35rem;
   min-width: 0;
   overflow: hidden;
 }
@@ -624,14 +625,14 @@ html[data-theme="dark"] #svg-object svg rect {
 }
 
 .drop-zone-info {
-  font-size: 0.78rem;
+  font-size: 0.9rem;
   color: var(--muted);
 }
 
 .upload-status {
   min-height: 1.1rem;
   margin-top: 0.55rem;
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   color: var(--muted);
 }
 
@@ -640,7 +641,7 @@ html[data-theme="dark"] #svg-object svg rect {
 }
 
 .plot-setup-card {
-  padding: 1.2rem;
+  padding: 1.35rem;
 }
 
 .plot-form {
@@ -651,7 +652,7 @@ html[data-theme="dark"] #svg-object svg rect {
 .plot-form label,
 .upload-label,
 .search-field span {
-  font-size: 0.8rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--muted);
 }
@@ -709,7 +710,7 @@ html[data-theme="dark"] #svg-object svg rect {
   border-radius: 0.7rem;
   background: var(--copy-button-bg);
   color: var(--action);
-  font-size: 0.82rem;
+  font-size: 0.94rem;
   font-weight: 600;
 }
 
@@ -725,7 +726,7 @@ html[data-theme="dark"] #svg-object svg rect {
 
 #copy-plot-command-status {
   min-height: 1.2rem;
-  font-size: 0.82rem;
+  font-size: 0.94rem;
   color: var(--muted);
 }
 
@@ -741,7 +742,7 @@ html[data-theme="dark"] #svg-object svg rect {
   margin: 0;
   padding: 0 1rem 0.75rem;
   font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-  font-size: 0.84rem;
+  font-size: 0.96rem;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--text);
@@ -931,7 +932,7 @@ ol#files li a.file-link:hover {
 
 @media (max-width: 960px) {
   .app-shell {
-    padding-top: 8.5rem;
+    padding-top: 9.5rem;
     padding-bottom: calc(var(--footer-height) + 2rem);
   }
 
@@ -963,7 +964,7 @@ ol#files li a.file-link:hover {
 
 @media (max-width: 640px) {
   .app-shell {
-    padding-top: 9.5rem;
+    padding-top: 10.5rem;
     padding-bottom: calc(var(--footer-height) + 3rem);
   }
 
