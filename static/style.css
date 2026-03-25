@@ -726,6 +726,35 @@ html[data-theme="dark"] #svg-object svg rect {
   width: 100%;
 }
 
+.delete-action-button {
+  align-items: center;
+  gap: 0.45rem;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.delete-action-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: currentColor;
+}
+
+.delete-action-button:hover {
+  background: color-mix(in srgb, var(--danger) 22%, var(--panel));
+}
+
+.delete-action-button:disabled {
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-text);
+}
+
 .plot-form {
   display: grid;
   gap: 0.8rem;

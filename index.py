@@ -65,6 +65,18 @@ def resolve_artwork_path(relative_path):
 
     return candidate_path
 
+
+def remove_empty_parent_directories(path, stop_dir):
+    current_dir = os.path.dirname(path)
+    stop_dir = os.path.abspath(stop_dir)
+
+    while current_dir.startswith(stop_dir) and current_dir != stop_dir:
+        try:
+            os.rmdir(current_dir)
+        except OSError:
+            break
+        current_dir = os.path.dirname(current_dir)
+
 # Define route: Default
 @app.route('/')
 def index():
@@ -186,6 +198,31 @@ def download_pdf(file):
         as_attachment=True,
         download_name=download_name,
     )
+
+
+@app.route('/files/<path:file>', methods=['DELETE'])
+def delete_file(file):
+    filepath = resolve_artwork_path(file)
+    if not filepath or not os.path.exists(filepath):
+        return Response(json.dumps({'error': 'File Not Found'}), status=404, mimetype='application/json')
+
+    if not filepath.lower().endswith('.svg'):
+        return Response(json.dumps({'error': 'Unsupported file type'}), status=400, mimetype='application/json')
+
+    thumbnail_path = os.path.join(app.config['UPLOAD_FOLDER'], build_thumbnail_relative_path(file))
+
+    try:
+        os.remove(filepath)
+        remove_empty_parent_directories(filepath, os.environ.get("ART_DIRECTORY"))
+
+        if os.path.exists(thumbnail_path):
+            os.remove(thumbnail_path)
+            remove_empty_parent_directories(thumbnail_path, app.config['UPLOAD_FOLDER'])
+    except OSError as error:
+        print(f"[WARN] Failed to delete file {file}: {error}")
+        return Response(json.dumps({'error': 'Failed to delete file'}), status=500, mimetype='application/json')
+
+    return Response(json.dumps({'deleted': file}), mimetype='application/json')
 
 @app.route('/status')
 def status():

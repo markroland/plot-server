@@ -265,6 +265,14 @@
                             </svg>
                             <span>Download PDF</span>
                         </a>
+                        <button id="delete-file-button" class="delete-action-button" type="button" disabled>
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v8h-2V9zm4 0h2v8h-2V9z"></path>
+                                <path d="M7 9h2v8H7V9z"></path>
+                                <path d="M6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 7z"></path>
+                            </svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </section>
             </aside>
@@ -312,6 +320,10 @@
             return `/download/${filename.split('/').map(encodeURIComponent).join('/')}`;
         }
 
+        function buildDeleteRequestPath(filename) {
+            return `/files/${filename.split('/').map(encodeURIComponent).join('/')}`;
+        }
+
         function updateDownloadLink(linkSelector, filename, hrefBuilder, downloadNameBuilder) {
             const downloadLink = document.querySelector(linkSelector);
             if (!downloadLink) {
@@ -332,6 +344,16 @@
             downloadLink.classList.remove('is-disabled');
         }
 
+        function updateDeleteButton(filename) {
+            const deleteButton = document.querySelector('#delete-file-button');
+            if (!deleteButton) {
+                return;
+            }
+
+            deleteButton.disabled = !filename;
+            deleteButton.dataset.filename = filename || '';
+        }
+
         function buildSvgAssetPath(filename) {
             return `/static/uploads/${filename.split('/').map(encodeURIComponent).join('/')}`;
         }
@@ -350,6 +372,79 @@
                 buildDownloadRequestPath,
                 (currentFilename) => currentFilename.replace(/\.svg$/i, '.pdf').split('/').pop()
             );
+
+            updateDeleteButton(filename);
+        }
+
+        function clearSelectedPlotState() {
+            const previewElement = document.querySelector('#svg-object');
+            previewElement.removeAttribute('data-filename');
+            previewElement.innerHTML = '';
+            currentSvgDimensions = null;
+            currentPreviewEstimate = null;
+
+            if (currentAnimator) {
+                currentAnimator.pause();
+            }
+
+            setSelectedPlot('');
+            setPlaybackControlsEnabled(false);
+            setPlaybackButtonState(false);
+            updatePlaybackProgress({ current: 0, total: 0, percentage: 0 });
+            document.querySelector('#svg-dimensions').textContent = '-';
+            document.querySelector('#plotter-fit').textContent = 'Fit: -';
+            document.querySelector('#plotter-fit').className = 'info-tile__meta';
+            resetPreviewEstimate('-');
+            updatePlotCommand();
+        }
+
+        async function deleteSelectedFile() {
+            const deleteButton = document.querySelector('#delete-file-button');
+            const filename = deleteButton?.dataset.filename || '';
+
+            if (!filename) {
+                return;
+            }
+
+            const confirmed = window.confirm(`Delete ${filename}? This cannot be undone.`);
+            if (!confirmed) {
+                return;
+            }
+
+            deleteButton.disabled = true;
+
+            try {
+                const response = await fetch(buildDeleteRequestPath(filename), { method: 'DELETE' });
+                if (!response.ok) {
+                    throw new Error(`Delete request failed with status ${response.status}`);
+                }
+
+                const listItem = document.querySelector(`#files li[data-filename="${CSS.escape(filename)}"]`);
+                const nextListItem = listItem?.nextElementSibling || listItem?.previousElementSibling || null;
+                listItem?.remove();
+
+                const url = new URL(window.location);
+
+                if (nextListItem) {
+                    const nextFilename = nextListItem.getAttribute('data-filename');
+                    const nextLink = nextListItem.querySelector('a.file-link');
+                    document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
+                    nextListItem.classList.add('selected');
+                    url.searchParams.set('plot', nextFilename);
+                    window.history.replaceState({}, '', url);
+                    setSelectedPlot(nextFilename);
+                    await loadAnimatedPreview(nextLink.getAttribute('href'), nextFilename);
+                } else {
+                    document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
+                    url.searchParams.delete('plot');
+                    window.history.replaceState({}, '', url);
+                    clearSelectedPlotState();
+                }
+            } catch (error) {
+                console.error('Failed to delete file:', error);
+                window.alert('Failed to delete file.');
+                deleteButton.disabled = false;
+            }
         }
 
         function getCurrentSvgElement() {
@@ -1145,6 +1240,10 @@
                     event.preventDefault();
                 }
             });
+        });
+
+        document.querySelector('#delete-file-button').addEventListener('click', function() {
+            deleteSelectedFile();
         });
 
         // Add event handler to Plot button
