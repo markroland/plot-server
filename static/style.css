@@ -482,6 +482,11 @@ div.artwork {
 }
 
 html[data-theme="dark"] #svg-object svg {
+  background: var(--text);
+}
+
+/*
+html[data-theme="dark"] #svg-object svg {
   background: #151210;
 }
 
@@ -494,6 +499,7 @@ html[data-theme="dark"] #svg-object svg ellipse,
 html[data-theme="dark"] #svg-object svg rect {
   stroke: var(--text) !important;
 }
+//*/
 
 .svg-info-grid {
   display: grid;
@@ -879,6 +885,12 @@ ol#files li a.file-link:hover {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  background-color: #fff;
+}
+html[data-theme="dark"] {
+  .file-thumb {
+    background-color: #efe8de;
+  }
 }
 
 .file-thumb-fallback {
