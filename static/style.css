@@ -399,7 +399,7 @@ button:disabled {
   gap: 0.9rem;
   padding: 1.25rem;
   border: 1px solid var(--frame-border);
-  border-radius: 1.1rem;
+  /* border-radius: 1.1rem; */
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   backdrop-filter: blur(8px);
 }
