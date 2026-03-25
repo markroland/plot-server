@@ -7,16 +7,22 @@
 #  nohup python index.py > /dev/null 2>&1 &
 
 from dotenv import load_dotenv
+from io import BytesIO
 import json
 import threading
 from pyaxidraw import axidraw
-from flask import Flask, request, Response, render_template
+from flask import Flask, request, Response, render_template, send_file
 from flask_cors import CORS
 import os
 from plotter_service import plot, preview_plot
 from plotter_status import PlotterStatusService
 from preview_parser import parse_preview_output
-from svg_library import build_file_entry, build_thumbnail_relative_path, generate_svg_thumbnail
+from svg_library import (
+    build_file_entry,
+    build_thumbnail_relative_path,
+    generate_svg_pdf_bytes,
+    generate_svg_thumbnail,
+)
 
 # Load settings from environment
 load_dotenv()
@@ -42,6 +48,23 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Example: Define the upload folder relative to the script
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
+
+def resolve_artwork_path(relative_path):
+    art_dir = os.environ.get("ART_DIRECTORY")
+    if not art_dir:
+        return None
+
+    art_dir_path = os.path.abspath(art_dir)
+    candidate_path = os.path.abspath(os.path.join(art_dir_path, relative_path))
+
+    try:
+        if os.path.commonpath([art_dir_path, candidate_path]) != art_dir_path:
+            return None
+    except ValueError:
+        return None
+
+    return candidate_path
+
 # Define route: Default
 @app.route('/')
 def index():
@@ -61,15 +84,15 @@ def index():
     return render_template('index.html', files=plot_files, art_dir=art_dir)
 
 # Define route for a plot request
-@app.route('/plot/<file>', methods=['GET', 'POST'])
+@app.route('/plot/<path:file>', methods=['GET', 'POST'])
 def plot_request(file):
 
     if request.method == 'GET':
 
-        filepath = os.environ.get("ART_DIRECTORY") + "/" + file
+        filepath = resolve_artwork_path(file)
 
         # Make sure the file exists
-        if not os.path.exists(filepath):
+        if not filepath or not os.path.exists(filepath):
 
             response = 'File Not Found', 404
 
@@ -139,6 +162,30 @@ def plot_request(file):
         #     return 'Busy', 503
 
         return '', 200
+
+
+@app.route('/download/<path:file>')
+def download_pdf(file):
+    filepath = resolve_artwork_path(file)
+    if not filepath or not os.path.exists(filepath):
+        return 'File Not Found', 404
+
+    if not filepath.lower().endswith('.svg'):
+        return 'Unsupported file type', 400
+
+    try:
+        pdf_bytes = generate_svg_pdf_bytes(filepath)
+    except Exception as error:
+        print(f"[WARN] Failed to generate PDF for {file}: {error}")
+        return 'Failed to generate PDF', 500
+
+    download_name = f"{os.path.splitext(os.path.basename(file))[0]}.pdf"
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=download_name,
+    )
 
 @app.route('/status')
 def status():

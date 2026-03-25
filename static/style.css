@@ -136,6 +136,44 @@ select {
   font: inherit;
 }
 
+.icon-action-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background-color 160ms ease, transform 160ms ease, opacity 160ms ease, color 160ms ease;
+  background: var(--copy-button-bg);
+  color: var(--action);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.icon-action-link:hover {
+  background: var(--copy-button-bg-hover);
+  color: var(--action);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.icon-action-link svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: currentColor;
+}
+
+.icon-action-link.is-disabled {
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-text);
+  cursor: not-allowed;
+  opacity: 0.65;
+  pointer-events: none;
+  transform: none;
+}
+
 button {
   display: inline-flex;
   align-items: center;
@@ -371,6 +409,14 @@ button:disabled {
 
 .panel-heading.compact {
   margin-bottom: 0.9rem;
+}
+
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: center;
+  margin-top: 1rem;
 }
 
 .artwork-frame {
@@ -662,6 +708,22 @@ html[data-theme="dark"] #svg-object svg rect {
 
 .plot-setup-card {
   padding: 1.35rem;
+}
+
+.download-card {
+  padding: 1.35rem;
+}
+
+.download-card .preview-actions {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0;
+}
+
+.download-card .icon-action-link {
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .plot-form {

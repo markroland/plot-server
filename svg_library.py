@@ -99,3 +99,7 @@ def generate_svg_thumbnail(svg_path, thumbnail_path):
 
     os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
     cairosvg.svg2png(url=svg_path, write_to=thumbnail_path, **output_kwargs)
+
+
+def generate_svg_pdf_bytes(svg_path):
+    return cairosvg.svg2pdf(url=svg_path)

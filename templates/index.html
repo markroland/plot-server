@@ -139,12 +139,12 @@
 
                 <div class="svg-info-grid">
                     <div class="info-tile">
-                        <span class="info-tile__label">SVG Dimensions</span>
+                        <span class="info-tile__label">Dimensions</span>
                         <strong id="svg-dimensions">-</strong>
                         <span id="plotter-fit" class="info-tile__meta">Fit: -</span>
                     </div>
                     <div class="info-tile info-tile--preview">
-                        <span class="info-tile__label">Plot Preview</span>
+                        <span class="info-tile__label">Estimated Stats</span>
                         <div class="preview-metrics">
                             <div class="preview-metric-row">
                                 <span class="preview-metric__label">Duration</span>
@@ -239,6 +239,34 @@
                         </div>
                     </details>
                 </section>
+
+                <section class="card download-card">
+                    <div class="panel-heading compact">
+                        <div>
+                            <p class="eyebrow">Artwork Files</p>
+                            <h2>File Management</h2>
+                        </div>
+                    </div>
+
+                    <div class="preview-actions" aria-label="Download selected file">
+                        <a id="download-svg-link" class="icon-action-link is-disabled" href="#" aria-disabled="true" title="Download SVG" aria-label="Download SVG">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1z"></path>
+                                <path d="M5 19a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1z"></path>
+                            </svg>
+                            <span>Download SVG</span>
+                        </a>
+                        <a id="download-pdf-link" class="icon-action-link is-disabled" href="#" aria-disabled="true" title="Download PDF" aria-label="Download PDF">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                                <path d="M7 2h7l5 5v12a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm6 1.5V8h4.5"></path>
+                                <path d="M8 16h2.1a1.9 1.9 0 0 0 0-3.8H8V16zm1.5-2.3h.5a.4.4 0 1 1 0 .8h-.5v-.8z"></path>
+                                <path d="M13 12.2h1.8a1.6 1.6 0 0 1 0 3.2H13v-3.2zm1.5 1.1v1h.2a.5.5 0 0 0 0-1h-.2z"></path>
+                                <path d="M17.5 12.2H20v1.1h-1.4v.2h1.2v1h-1.2V16h-1.1v-3.8z"></path>
+                            </svg>
+                            <span>Download PDF</span>
+                        </a>
+                    </div>
+                </section>
             </aside>
         </main>
 
@@ -270,6 +298,7 @@
 
         function setSelectedPlot(filename) {
             setText("#selected-sketch-name", `File: ${filename || "No plot selected"}`);
+            updateDownloadLinks(filename);
         }
 
         function buildPlotRequestPath(filename, queryParams = {}) {
@@ -277,6 +306,50 @@
             const params = new URLSearchParams(queryParams);
             const queryString = params.toString();
             return queryString ? `${requestPath}?${queryString}` : requestPath;
+        }
+
+        function buildDownloadRequestPath(filename) {
+            return `/download/${filename.split('/').map(encodeURIComponent).join('/')}`;
+        }
+
+        function updateDownloadLink(linkSelector, filename, hrefBuilder, downloadNameBuilder) {
+            const downloadLink = document.querySelector(linkSelector);
+            if (!downloadLink) {
+                return;
+            }
+
+            if (!filename) {
+                downloadLink.setAttribute('href', '#');
+                downloadLink.setAttribute('aria-disabled', 'true');
+                downloadLink.classList.add('is-disabled');
+                downloadLink.removeAttribute('download');
+                return;
+            }
+
+            downloadLink.setAttribute('href', hrefBuilder(filename));
+            downloadLink.setAttribute('download', downloadNameBuilder(filename));
+            downloadLink.setAttribute('aria-disabled', 'false');
+            downloadLink.classList.remove('is-disabled');
+        }
+
+        function buildSvgAssetPath(filename) {
+            return `/static/uploads/${filename.split('/').map(encodeURIComponent).join('/')}`;
+        }
+
+        function updateDownloadLinks(filename) {
+            updateDownloadLink(
+                '#download-svg-link',
+                filename,
+                buildSvgAssetPath,
+                (currentFilename) => currentFilename.split('/').pop()
+            );
+
+            updateDownloadLink(
+                '#download-pdf-link',
+                filename,
+                buildDownloadRequestPath,
+                (currentFilename) => currentFilename.replace(/\.svg$/i, '.pdf').split('/').pop()
+            );
         }
 
         function getCurrentSvgElement() {
@@ -1064,6 +1137,14 @@
                 console.error('Failed to copy plot command:', error);
                 showCopyPlotCommandStatus('Copy failed', true);
             }
+        });
+
+        ['#download-svg-link', '#download-pdf-link'].forEach((selector) => {
+            document.querySelector(selector).addEventListener('click', function(event) {
+                if (event.currentTarget.getAttribute('aria-disabled') === 'true') {
+                    event.preventDefault();
+                }
+            });
         });
 
         // Add event handler to Plot button

@@ -2,7 +2,8 @@
 
 The purpose of this project is to provide a web-based interface for starting plots
 with an AxiDraw plotter. It looks at a folder of SVG images, and provides controls
-for viewing and plotting them.
+for viewing and plotting them. Uploaded SVG files generate PNG thumbnails, and the
+selected SVG can be downloaded as a PDF on demand from the web UI.
 
 ## Installation
 
