@@ -77,6 +77,11 @@ def remove_empty_parent_directories(path, stop_dir):
             break
         current_dir = os.path.dirname(current_dir)
 
+
+def get_file_added_timestamp(path):
+    file_stats = os.stat(path)
+    return getattr(file_stats, 'st_birthtime', file_stats.st_mtime)
+
 # Define route: Default
 @app.route('/')
 def index():
@@ -88,10 +93,12 @@ def index():
         for f in files:
             if f.lower().endswith('.svg'):
                 # Store relative path from art_dir
-                rel_path = os.path.relpath(os.path.join(root, f), art_dir)
-                plot_files.append(build_file_entry(rel_path))
+                absolute_path = os.path.join(root, f)
+                rel_path = os.path.relpath(absolute_path, art_dir)
+                plot_files.append((get_file_added_timestamp(absolute_path), build_file_entry(rel_path)))
 
-    plot_files.sort(key=lambda item: item['filename'].lower())
+    plot_files.sort(key=lambda item: (-item[0], item[1]['filename'].lower()))
+    plot_files = [entry for _, entry in plot_files]
 
     return render_template('index.html', files=plot_files, art_dir=art_dir)
 
