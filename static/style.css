@@ -122,6 +122,10 @@ body {
   color: var(--text);
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 a {
   color: var(--link);
 }
@@ -1074,6 +1078,101 @@ html[data-theme="dark"] {
   backdrop-filter: blur(8px);
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(21, 18, 16, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 42rem);
+  padding: 1.5rem;
+  border-radius: 1.4rem;
+  background: var(--panel-strong);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-strong);
+}
+
+.modal-card__content {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.modal-card__icon {
+  width: clamp(3rem, 8vw, 4rem);
+  height: clamp(3rem, 8vw, 4rem);
+  margin: 0 auto 0.1rem;
+}
+
+.modal-card h2 {
+  margin: 0;
+  text-align: center;
+}
+
+.modal-version {
+  margin: -0.35rem 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.modal-copy {
+  display: grid;
+  gap: 0.85rem;
+  color: var(--muted);
+}
+
+.modal-copy p {
+  margin: 0;
+}
+
+.modal-section-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.modal-copy ul {
+  margin-top: 0;
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  min-height: 2.4rem;
+  width: 2.4rem;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--copy-button-bg);
+  color: var(--text);
+}
+
+.modal-close-button:hover {
+  background: var(--copy-button-bg-hover);
+}
+
+.modal-close-button svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
 @media (max-width: 960px) {
   .app-shell {
     padding-top: 9.5rem;
@@ -1144,6 +1243,14 @@ html[data-theme="dark"] {
   .app-footer {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .modal-overlay {
+    padding: 1rem;
+  }
+
+  .modal-card {
+    padding: 1.2rem;
   }
 
   .plot-command-actions {

@@ -38,6 +38,7 @@ status_service = PlotterStatusService(ad, sem)
 
 # Create new Flask app
 app = Flask(__name__)
+APP_VERSION = "1.0.0"
 
 # Enable CORS
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -100,7 +101,7 @@ def index():
     plot_files.sort(key=lambda item: (-item[0], item[1]['filename'].lower()))
     plot_files = [entry for _, entry in plot_files]
 
-    return render_template('index.html', files=plot_files, art_dir=art_dir)
+    return render_template('index.html', files=plot_files, art_dir=art_dir, app_version=APP_VERSION)
 
 # Define route for a plot request
 @app.route('/plot/<path:file>', methods=['GET', 'POST'])

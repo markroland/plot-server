@@ -284,10 +284,42 @@
         </main>
 
         <footer class="app-footer">
-            Created by <a href="https://markroland.com" target="_blank" rel="noreferrer noopener">Mark Roland</a>
-            <span aria-hidden="true">|</span>
-            <a href="https://github.com/markroland/plot-server" target="_blank" rel="noreferrer noopener">View on GitHub</a>
+            <a href="#info" id="info-link" class="footer-info-link" aria-haspopup="dialog" aria-controls="info-modal">Project Info</a>
         </footer>
+
+        <div id="info-modal" class="modal-overlay" hidden>
+            <div class="modal-backdrop" data-close-modal="true"></div>
+            <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="info-modal-title" aria-describedby="info-modal-description">
+                <button id="info-modal-close" class="modal-close-button" type="button" aria-label="Close project information">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M6.7 5.3 12 10.6l5.3-5.3 1.4 1.4-5.3 5.3 5.3 5.3-1.4 1.4-5.3-5.3-5.3 5.3-1.4-1.4 5.3-5.3-5.3-5.3z"></path>
+                    </svg>
+                </button>
+                <div class="modal-card__content">
+                    <p class="eyebrow">Project Info</p>
+                    <img class="app-title__icon modal-card__icon" src="/static/images/plot-server-icon.svg" alt="" aria-hidden="true">
+                    <h2 id="info-modal-title">Plot Server</h2>
+                    <p class="modal-version">Version {{ app_version }}</p>
+                    <br />
+                    <div id="info-modal-description" class="modal-copy">
+                        <p><em>Plot Server</em> is a lightweight interface for managing SVG artwork and plotting with an <a href="https://axidraw.com" target="_blank" rel="noreferrer noopener">AxiDraw</a> plotter.</p>
+                        <p>This project was created by <a href="https://markroland.com" target="_blank" rel="noreferrer noopener">Mark Roland</a> and is available on <a href="https://github.com/markroland/plot-server" target="_blank" rel="noreferrer noopener">GitHub</a>.</p>
+
+                        <p class="modal-section-title">Site Requirements:</p>
+                        <ul>
+                            <li>Python 3.8 or higher</li>
+                            <li><a href="https://github.com/markroland/plot-animator" target="_blank" rel="noreferrer noopener">Simple Plot Animator</a> (Currently Unpublished)</li>
+                            <!-- <li><a href="https://axidraw.com/doc/py_api/#about-axidraw" target="_blank" rel="noreferrer noopener">AxiDraw Python Library</a> (3.9.6)</li> -->
+                        </ul>
+
+                        <p class="modal-section-title">Plotter Requirements:</p>
+                        <ul>
+                            <li>AxiDraw Plotter (<a href="https://shop.evilmadscientist.com/directory" target="_blank" rel="noreferrer noopener">shop</a>)</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 
     <script>
@@ -318,6 +350,53 @@
             }
 
             sourceElement.textContent = svgMarkup || 'No SVG loaded.';
+        }
+
+        function setInfoModalOpen(isOpen) {
+            const modalElement = document.querySelector('#info-modal');
+            if (!modalElement) {
+                return;
+            }
+
+            modalElement.hidden = !isOpen;
+            document.body.classList.toggle('modal-open', isOpen);
+
+            if (isOpen) {
+                document.querySelector('#info-modal-close')?.focus();
+            } else {
+                document.querySelector('#info-link')?.focus();
+            }
+        }
+
+        function initializeInfoModal() {
+            const modalElement = document.querySelector('#info-modal');
+            const openLink = document.querySelector('#info-link');
+            const closeButton = document.querySelector('#info-modal-close');
+
+            if (!modalElement || !openLink || !closeButton) {
+                return;
+            }
+
+            openLink.addEventListener('click', function(event) {
+                event.preventDefault();
+                setInfoModalOpen(true);
+            });
+
+            closeButton.addEventListener('click', function() {
+                setInfoModalOpen(false);
+            });
+
+            modalElement.addEventListener('click', function(event) {
+                if (event.target instanceof HTMLElement && event.target.dataset.closeModal === 'true') {
+                    setInfoModalOpen(false);
+                }
+            });
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && !modalElement.hidden) {
+                    setInfoModalOpen(false);
+                }
+            });
         }
 
         function getInkscapeLabel(element) {
@@ -1410,6 +1489,7 @@
             initializeThemeToggle();
             initializeUploadDropZone();
             initializePlaybackControls();
+            initializeInfoModal();
             initializeFileThumbnails();
             const urlParams = new URLSearchParams(window.location.search);
             let plotParam = urlParams.get('plot');
