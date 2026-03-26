@@ -19,19 +19,23 @@ SVG_LENGTH_UNIT_TO_PX = {
 
 
 def normalize_relative_path(path):
+    """Normalize a relative path for use in URLs and cross-platform comparisons."""
     return path.replace(os.sep, '/')
 
 
 def build_public_upload_url(relative_path):
+    """Build the public static URL for an uploaded asset."""
     return f"/static/uploads/{normalize_relative_path(relative_path)}"
 
 
 def build_thumbnail_relative_path(relative_path):
+    """Return the thumbnail path for a given uploaded SVG path."""
     base_path, _ = os.path.splitext(relative_path)
     return normalize_relative_path(f"{base_path}{THUMBNAIL_SUFFIX}")
 
 
 def build_file_entry(relative_path):
+    """Build the metadata payload used by the UI for one SVG file."""
     normalized_path = normalize_relative_path(relative_path)
     return {
         'filename': normalized_path,
@@ -41,6 +45,7 @@ def build_file_entry(relative_path):
 
 
 def parse_svg_length_to_px(value):
+    """Convert a raw SVG length string into pixels when the unit is supported."""
     if not value:
         return None
 
@@ -62,6 +67,7 @@ def parse_svg_length_to_px(value):
 
 
 def get_svg_dimensions_px(svg_path):
+    """Determine the SVG canvas dimensions in pixels from viewBox or size attributes."""
     try:
         root = ET.parse(svg_path).getroot()
     except (ET.ParseError, OSError) as error:
@@ -89,6 +95,7 @@ def get_svg_dimensions_px(svg_path):
 
 
 def generate_svg_thumbnail(svg_path, thumbnail_path):
+    """Render a PNG thumbnail for an SVG, preserving portrait or landscape orientation."""
     dimensions = get_svg_dimensions_px(svg_path)
     output_kwargs = {'output_width': THUMBNAIL_LONG_EDGE_PX}
 
@@ -102,4 +109,5 @@ def generate_svg_thumbnail(svg_path, thumbnail_path):
 
 
 def generate_svg_pdf_bytes(svg_path):
+    """Render an SVG file to PDF bytes for on-demand download responses."""
     return cairosvg.svg2pdf(url=svg_path)

@@ -3,6 +3,7 @@ import io
 
 
 def plot(ad, filepath, layer=0, model_number=4):
+    """Plot an SVG file, optionally restricted to a single numbered layer."""
     ad.plot_setup(filepath)
     ad.options.mode = "plot"
     ad.options.model = model_number
@@ -23,6 +24,7 @@ def plot(ad, filepath, layer=0, model_number=4):
 
 
 def preview_plot(ad, filepath, layer=0):
+    """Run a preview pass and return the captured AxiDraw output text."""
     output_buffer = io.StringIO()
     previous_preview = getattr(ad.options, 'preview', False)
     previous_report_time = getattr(ad.options, 'report_time', False)

@@ -4,6 +4,7 @@ import os
 
 class PlotterStatusService:
     def __init__(self, ad, sem):
+        """Store shared plotter dependencies and initialize cached status state."""
         self.ad = ad
         self.sem = sem
         self.device_cache = {}
@@ -17,6 +18,7 @@ class PlotterStatusService:
         }
 
     def load_axidraw_config(self, config_path):
+        """Load a model-specific AxiDraw config module into a serializable dictionary."""
         if not config_path or not os.path.exists(config_path):
             return {}
 
@@ -94,6 +96,7 @@ class PlotterStatusService:
             return {}
 
     def get_plotter_status(self):
+        """Inspect the connected AxiDraw and return the latest machine status snapshot."""
         status_data = {
             "status": "off",
             "machine": "none",

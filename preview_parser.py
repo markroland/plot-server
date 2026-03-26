@@ -2,6 +2,7 @@ import re
 
 
 def parse_duration_to_seconds(duration_text):
+    """Convert a preview duration string into a total number of seconds."""
     parts = [int(part) for part in duration_text.split(':')]
 
     if len(parts) == 3:
@@ -19,6 +20,7 @@ def parse_duration_to_seconds(duration_text):
 
 
 def parse_preview_output(preview_output):
+    """Extract timing and distance metrics from AxiDraw preview console output."""
     duration_match = re.search(r'Estimated print time:\s*([0-9:]+)', preview_output)
     path_match = re.search(r'Length of path to draw:\s*([0-9]+(?:\.[0-9]+)?)\s*m', preview_output)
     travel_match = re.search(r'Pen-up travel distance:\s*([0-9]+(?:\.[0-9]+)?)\s*m', preview_output)

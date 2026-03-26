@@ -51,6 +51,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 art_dir = app.config['UPLOAD_FOLDER']
 
 def resolve_artwork_path(relative_path):
+    """Resolve a user-supplied artwork path within the configured art directory."""
     art_dir_path = os.path.abspath(art_dir)
     candidate_path = os.path.abspath(os.path.join(art_dir_path, relative_path))
 
@@ -64,6 +65,7 @@ def resolve_artwork_path(relative_path):
 
 
 def remove_empty_parent_directories(path, stop_dir):
+    """Remove empty parent directories until reaching the configured stop directory."""
     current_dir = os.path.dirname(path)
     stop_dir = os.path.abspath(stop_dir)
 
@@ -76,12 +78,14 @@ def remove_empty_parent_directories(path, stop_dir):
 
 
 def get_file_added_timestamp(path):
+    """Return the file creation time when available, otherwise the modification time."""
     file_stats = os.stat(path)
     return getattr(file_stats, 'st_birthtime', file_stats.st_mtime)
 
 # Define route: Default
 @app.route('/')
 def index():
+    """Render the main page with the available SVG files sorted newest first."""
 
     # Recursively get all .svg files in art_dir and subdirectories
     plot_files = []
@@ -101,6 +105,7 @@ def index():
 # Define route for a plot request
 @app.route('/plot/<path:file>', methods=['GET', 'POST'])
 def plot_request(file):
+    """Handle preview, plotting, and SVG upload requests for a given file path."""
 
     if request.method == 'GET':
 
@@ -108,6 +113,7 @@ def plot_request(file):
 
         # Make sure the file exists
         if not filepath or not os.path.exists(filepath):
+
             response = 'File Not Found', 404
 
             return response
@@ -163,15 +169,16 @@ def plot_request(file):
 
         return '', 200
 
-
 @app.route('/download/<path:file>')
 def download_pdf(file):
+    """Generate and return a PDF download for the requested SVG file."""
     filepath = resolve_artwork_path(file)
     if not filepath or not os.path.exists(filepath):
         return 'File Not Found', 404
 
     if not filepath.lower().endswith('.svg'):
         return 'Unsupported file type', 400
+
     try:
         pdf_bytes = generate_svg_pdf_bytes(filepath)
     except Exception as error:
@@ -189,6 +196,7 @@ def download_pdf(file):
 
 @app.route('/files/<path:file>', methods=['DELETE'])
 def delete_file(file):
+    """Delete an SVG file and its generated thumbnail from the artwork library."""
     filepath = resolve_artwork_path(file)
     if not filepath or not os.path.exists(filepath):
         return Response(json.dumps({'error': 'File Not Found'}), status=404, mimetype='application/json')
@@ -208,6 +216,7 @@ def delete_file(file):
     except OSError as error:
         print(f"[WARN] Failed to delete file {file}: {error}")
         return Response(json.dumps({'error': 'Failed to delete file'}), status=500, mimetype='application/json')
+
     return Response(json.dumps({'deleted': file}), mimetype='application/json')
 
 @app.route('/status')
