@@ -957,17 +957,13 @@
         xhr.onload = function() {
             if (xhr.status === 200) {
                 let plotterData = JSON.parse(xhr.responseText);
-                console.log("Plotter data:", plotterData);
 
                 // Update status display
                 updatePlotterStatus(plotterData);
 
                 // Enable plot buttons if plotter is ready
                 if (plotterData.status === "on") {
-                    console.log("Plotter is ready");
                     document.querySelector("#submit_plot").disabled = false;
-                } else {
-                    console.log("Plotter status:", plotterData.status);
                 }
             } else {
                 console.log("Error: " + xhr.status);
