@@ -554,6 +554,33 @@ html[data-theme="dark"] #svg-object svg rect {
   margin-top: 1rem;
 }
 
+.preview-source-card {
+  margin-top: 1rem;
+  border-radius: 1rem;
+  background: var(--details-bg);
+  border: 1px solid var(--details-border);
+}
+
+.preview-source-card summary {
+  cursor: pointer;
+  padding: 0.9rem 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.svg-source-text {
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0 1rem 1rem;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
 .playback-controls {
   margin-top: 1rem;
   padding: 1rem;

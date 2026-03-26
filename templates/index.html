@@ -164,6 +164,11 @@
                         </div>
                     </div>
                 </div>
+
+                <details class="preview-source-card">
+                    <summary>SVG Source</summary>
+                    <pre id="svg-source-text" class="svg-source-text">No SVG loaded.</pre>
+                </details>
             </section>
 
             <aside class="control-rail">
@@ -304,6 +309,15 @@
             if (element) {
                 element.textContent = value;
             }
+        }
+
+        function setSvgSourceText(svgMarkup) {
+            const sourceElement = document.querySelector('#svg-source-text');
+            if (!sourceElement) {
+                return;
+            }
+
+            sourceElement.textContent = svgMarkup || 'No SVG loaded.';
         }
 
         function getInkscapeLabel(element) {
@@ -492,6 +506,7 @@
             previewElement.innerHTML = '';
             currentSvgDimensions = null;
             currentPreviewEstimate = null;
+            setSvgSourceText('');
 
             if (currentAnimator) {
                 currentAnimator.pause();
@@ -1184,6 +1199,7 @@
                 const svgMarkup = await svgResponse.text();
                 const previewPayload = buildPreviewSvgPayload(svgMarkup, selectedLayerValue);
                 currentPreviewObjectUrl = URL.createObjectURL(new Blob([previewPayload.previewSvgMarkup], { type: 'image/svg+xml' }));
+                setSvgSourceText(previewPayload.previewSvgMarkup);
 
                 const SimplePlotAnimatorClass = getSimplePlotAnimatorClass();
                 if (!SimplePlotAnimatorClass) {
@@ -1224,6 +1240,7 @@
             } catch (error) {
                 console.error('Failed to load animated preview:', error);
                 previewElement.innerHTML = '<div class="plot-animator-error">Error loading preview</div>';
+                setSvgSourceText('');
             } finally {
                 if (loadRequestId === previewLoadRequestId) {
                     setPreviewLoading(false);
