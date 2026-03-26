@@ -122,7 +122,8 @@ def plot_request(file):
         if sem.acquire(True, 0.1):
             try:
                 if request.args.get("preview", "").lower() == "true":
-                    preview_output = preview_plot(ad, filepath)
+                    preview_layer = request.args.get("layer", default=0, type=int)
+                    preview_output = preview_plot(ad, filepath, preview_layer)
                     preview_data = parse_preview_output(preview_output)
                     return Response(json.dumps(preview_data), mimetype='application/json')
 

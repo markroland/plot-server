@@ -294,14 +294,102 @@
         let currentSvgDimensions = null;
         let currentPreviewEstimate = null;
         let currentAnimator = null;
+        let currentPreviewObjectUrl = null;
         let isPlaybackActive = false;
         let previewLoadRequestId = 0;
+        const INKSCAPE_NAMESPACE = 'http://www.inkscape.org/namespaces/inkscape';
 
         function setText(selector, value) {
             const element = document.querySelector(selector);
             if (element) {
                 element.textContent = value;
             }
+        }
+
+        function getInkscapeLabel(element) {
+            return (
+                element.getAttribute('inkscape:label')
+                || element.getAttributeNS(INKSCAPE_NAMESPACE, 'label')
+                || ''
+            ).trim();
+        }
+
+        function extractPlottableLayers(svgElement) {
+            const seenLabels = new Set();
+            const layers = [];
+
+            svgElement.querySelectorAll('g').forEach((groupElement) => {
+                const label = getInkscapeLabel(groupElement);
+                const match = label.match(/^([1-9]\d*)(?:\b|\D)/);
+
+                if (!match || seenLabels.has(label)) {
+                    return;
+                }
+
+                seenLabels.add(label);
+                layers.push({
+                    label,
+                    number: Number(match[1]),
+                });
+            });
+
+            layers.sort((left, right) => left.number - right.number || left.label.localeCompare(right.label));
+            return layers;
+        }
+
+        function buildPreviewRequestQuery(selectedLayerValue) {
+            const queryParams = { preview: 'true' };
+            if (selectedLayerValue) {
+                queryParams.layer = selectedLayerValue;
+            }
+            return queryParams;
+        }
+
+        function buildPreviewSvgPayload(svgMarkup, selectedLayerValue) {
+            const parser = new DOMParser();
+            const svgDocument = parser.parseFromString(svgMarkup, 'image/svg+xml');
+            const parserError = svgDocument.querySelector('parsererror');
+            if (parserError) {
+                throw new Error('Failed to parse SVG preview markup');
+            }
+
+            const sourceSvgElement = svgDocument.documentElement;
+            const availableLayers = extractPlottableLayers(sourceSvgElement);
+
+            if (!selectedLayerValue) {
+                return {
+                    availableLayers,
+                    previewSvgMarkup: svgMarkup,
+                };
+            }
+
+            const selectedLayerNumber = Number(selectedLayerValue);
+            const filteredSvgElement = sourceSvgElement.cloneNode(true);
+            filteredSvgElement.querySelectorAll('g').forEach((groupElement) => {
+                const label = getInkscapeLabel(groupElement);
+                const match = label.match(/^([1-9]\d*)(?:\b|\D)/);
+                if (!match) {
+                    return;
+                }
+
+                if (Number(match[1]) !== selectedLayerNumber) {
+                    groupElement.remove();
+                }
+            });
+
+            return {
+                availableLayers,
+                previewSvgMarkup: new XMLSerializer().serializeToString(filteredSvgElement),
+            };
+        }
+
+        function revokeCurrentPreviewObjectUrl() {
+            if (!currentPreviewObjectUrl) {
+                return;
+            }
+
+            URL.revokeObjectURL(currentPreviewObjectUrl);
+            currentPreviewObjectUrl = null;
         }
 
         function scrollLibraryItemIntoView(listItem) {
@@ -330,6 +418,20 @@
 
         function buildDeleteRequestPath(filename) {
             return `/files/${filename.split('/').map(encodeURIComponent).join('/')}`;
+        }
+
+        function getRequestedLayerValue() {
+            return new URLSearchParams(window.location.search).get('layer') || '';
+        }
+
+        function updateLayerQueryString(layerValue) {
+            const url = new URL(window.location);
+            if (layerValue) {
+                url.searchParams.set('layer', layerValue);
+            } else {
+                url.searchParams.delete('layer');
+            }
+            window.history.replaceState({}, '', url);
         }
 
         function updateDownloadLink(linkSelector, filename, hrefBuilder, downloadNameBuilder) {
@@ -440,12 +542,14 @@
                     nextListItem.classList.add('selected');
                     scrollLibraryItemIntoView(nextListItem);
                     url.searchParams.set('plot', nextFilename);
+                    url.searchParams.delete('layer');
                     window.history.replaceState({}, '', url);
                     setSelectedPlot(nextFilename);
-                    await loadAnimatedPreview(nextLink.getAttribute('href'), nextFilename);
+                    await loadAnimatedPreview(nextLink.getAttribute('href'), nextFilename, '');
                 } else {
                     document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
                     url.searchParams.delete('plot');
+                    url.searchParams.delete('layer');
                     window.history.replaceState({}, '', url);
                     clearSelectedPlotState();
                 }
@@ -569,14 +673,14 @@
             setText('#preview-travel', formatMeters(Number(data.plot_travel)));
         }
 
-        async function loadPreviewEstimate(filename, loadRequestId) {
+        async function loadPreviewEstimate(filename, loadRequestId, selectedLayerValue = '') {
             resetPreviewEstimate('Loading');
             document.querySelector('#preview-duration').className = 'preview-metric__value info-tile__value--pending';
             document.querySelector('#preview-path').className = 'preview-metric__value info-tile__value--pending';
             document.querySelector('#preview-travel').className = 'preview-metric__value info-tile__value--pending';
 
             try {
-                const response = await fetch(buildPlotRequestPath(filename, { preview: 'true' }));
+                const response = await fetch(buildPlotRequestPath(filename, buildPreviewRequestQuery(selectedLayerValue)));
                 if (loadRequestId !== previewLoadRequestId) {
                     return;
                 }
@@ -1002,7 +1106,7 @@
             }
         }
 
-        function analyzeLoadedSvg(filename) {
+        function analyzeLoadedSvg(filename, availableLayers = null, selectedLayerValue = '') {
             const svgElement = getCurrentSvgElement();
 
             if (!svgElement) {
@@ -1028,17 +1132,7 @@
                 fitElement.className = "";
             }
 
-            const groups = svgElement.querySelectorAll('g');
-            let layers = [];
-            let layer_regex = new RegExp(/^\d/);
-            groups.forEach((item) => {
-                if (item.hasAttribute("inkscape:label")) {
-                    let layer_name = item.getAttribute("inkscape:label");
-                    if (layer_regex.test(layer_name)) {
-                        layers.push(layer_name);
-                    }
-                }
-            });
+            const layers = availableLayers || extractPlottableLayers(svgElement);
 
             document.querySelector("form[name=plot] input[name=filename]").value = filename;
 
@@ -1054,16 +1148,18 @@
             select_menu.appendChild(opt);
             layers.forEach((item) => {
                 let opt = document.createElement("option");
-                let layer_number = item.match(/^(\d+)/)[0];
-                opt.value = layer_number;
-                opt.textContent = item;
+                opt.value = String(item.number);
+                opt.textContent = item.label;
                 select_menu.appendChild(opt);
             });
+
+            const hasSelectedLayer = selectedLayerValue && layers.some((item) => String(item.number) === selectedLayerValue);
+            select_menu.value = hasSelectedLayer ? selectedLayerValue : '';
 
             updatePlotCommand();
         }
 
-        async function loadAnimatedPreview(filepath, filename) {
+        async function loadAnimatedPreview(filepath, filename, selectedLayerValue = '') {
             const previewElement = document.querySelector('#svg-object');
             const loadRequestId = ++previewLoadRequestId;
             previewElement.setAttribute('data-filename', filename);
@@ -1071,14 +1167,24 @@
             if (currentAnimator) {
                 currentAnimator.pause();
             }
+            revokeCurrentPreviewObjectUrl();
             setPlaybackControlsEnabled(false);
             setPlaybackButtonState(false);
             updatePlaybackProgress({ current: 0, total: 0, percentage: 0 });
             setPreviewLoading(true, 'Loading SVG...');
-            loadPreviewEstimate(filename, loadRequestId);
+            loadPreviewEstimate(filename, loadRequestId, selectedLayerValue);
             await waitForBrowserFrame();
 
             try {
+                const svgResponse = await fetch(filepath);
+                if (!svgResponse.ok) {
+                    throw new Error(`SVG request failed with status ${svgResponse.status}`);
+                }
+
+                const svgMarkup = await svgResponse.text();
+                const previewPayload = buildPreviewSvgPayload(svgMarkup, selectedLayerValue);
+                currentPreviewObjectUrl = URL.createObjectURL(new Blob([previewPayload.previewSvgMarkup], { type: 'image/svg+xml' }));
+
                 const SimplePlotAnimatorClass = getSimplePlotAnimatorClass();
                 if (!SimplePlotAnimatorClass) {
                     throw new Error('SimplePlotAnimator UMD bundle is not available');
@@ -1104,14 +1210,14 @@
                 }
 
                 setPreviewLoading(true, 'Rendering preview...');
-                const loaded = await currentAnimator.loadFromURL(filepath);
+                const loaded = await currentAnimator.loadFromURL(currentPreviewObjectUrl);
                 if (!loaded || loadRequestId !== previewLoadRequestId) {
                     return;
                 }
 
                 setPreviewLoading(true, 'Analyzing layers...');
                 await waitForBrowserFrame();
-                analyzeLoadedSvg(filename);
+                analyzeLoadedSvg(filename, previewPayload.availableLayers, selectedLayerValue);
                 setPlaybackControlsEnabled(true);
                 updatePlaybackProgress({ current: 0, total: currentAnimator.paths.length, percentage: 0 });
                 setPlaybackButtonState(false);
@@ -1165,9 +1271,10 @@
                 // Update the URL with ?plot={plotname} (no reload)
                 const url = new URL(window.location);
                 url.searchParams.set('plot', filename);
+                url.searchParams.delete('layer');
                 window.history.replaceState({}, '', url);
 
-                await loadAnimatedPreview(filepath, filename);
+                await loadAnimatedPreview(filepath, filename, '');
             });
         });
 
@@ -1228,6 +1335,16 @@
             elem.addEventListener("change", updatePlotCommand);
         });
 
+        document.querySelector('select[name=layer]').addEventListener('change', function(event) {
+            const filename = document.querySelector("form[name=plot] input[name=filename]").value;
+            if (!filename) {
+                return;
+            }
+
+            updateLayerQueryString(event.target.value);
+            loadAnimatedPreview(buildSvgAssetPath(filename), filename, event.target.value);
+        });
+
         document.querySelector('#copy-plot-command').addEventListener('click', async function() {
             const command = document.querySelector('#plot-command').textContent.trim();
 
@@ -1283,6 +1400,7 @@
             initializeFileThumbnails();
             const urlParams = new URLSearchParams(window.location.search);
             let plotParam = urlParams.get('plot');
+            let layerParam = urlParams.get('layer') || '';
             let found = false;
             if (plotParam) {
                 // Try to find the matching plot in the list
@@ -1291,7 +1409,7 @@
                     let filename = plotLink.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
                     setSelectedPlot(filename);
-                    loadAnimatedPreview(filepath, filename);
+                    loadAnimatedPreview(filepath, filename, layerParam);
                     // Highlight the selected item
                     plotLink.parentElement.classList.add('selected');
                     scrollLibraryItemIntoView(plotLink.parentElement);
@@ -1305,7 +1423,7 @@
                     let filename = first_plot.getAttribute('data-filename');
                     let filepath = "/static/uploads/" + filename;
                     setSelectedPlot(filename);
-                    loadAnimatedPreview(filepath, filename);
+                    loadAnimatedPreview(filepath, filename, layerParam);
                     first_plot.parentElement.classList.add('selected');
                     scrollLibraryItemIntoView(first_plot.parentElement);
                 }
