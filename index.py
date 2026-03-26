@@ -161,21 +161,6 @@ def plot_request(file):
         except Exception as error:
             print(f"[WARN] Failed to generate thumbnail for {filename}: {error}")
 
-        # Plot the uploaded file
-        # if sem.acquire(True, 0.1):
-        #     try:
-        #         layer = request.args.get("layer", default=0, type=int)
-        #         plot(filepath, layer)
-        #         # os.remove(filepath)
-        #         return f'Done: {layer}', 200
-        #     except Exception as e:
-        #         print(f"[ERROR] Exception during plot: {e}")
-        #         return f'Error: {e}', 500
-        #     finally:
-        #         sem.release()
-        # else:
-        #     return 'Busy', 503
-
         return '', 200
 
 
@@ -187,7 +172,6 @@ def download_pdf(file):
 
     if not filepath.lower().endswith('.svg'):
         return 'Unsupported file type', 400
-
     try:
         pdf_bytes = generate_svg_pdf_bytes(filepath)
     except Exception as error:
@@ -257,12 +241,5 @@ def status_json():
 
     return response
 
-# Set up cross origin resource sharing
-# @app.after_request
-# def after_request(response):
-#     response.headers.add('Access-Control-Allow-Origin', 'http://project.markroland.com')
-#     response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT')
-#     return response
-
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=os.environ.get("HOST_PORT"))
+    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("HOST_PORT", 5007)))
