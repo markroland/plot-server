@@ -48,12 +48,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Example: Define the upload folder relative to the script
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
+art_dir = app.config['UPLOAD_FOLDER']
 
 def resolve_artwork_path(relative_path):
-    art_dir = os.environ.get("ART_DIRECTORY")
-    if not art_dir:
-        return None
-
     art_dir_path = os.path.abspath(art_dir)
     candidate_path = os.path.abspath(os.path.join(art_dir_path, relative_path))
 
@@ -87,7 +84,6 @@ def get_file_added_timestamp(path):
 def index():
 
     # Recursively get all .svg files in art_dir and subdirectories
-    art_dir = os.environ.get("ART_DIRECTORY")
     plot_files = []
     for root, dirs, files in os.walk(art_dir):
         for f in files:
@@ -112,7 +108,6 @@ def plot_request(file):
 
         # Make sure the file exists
         if not filepath or not os.path.exists(filepath):
-
             response = 'File Not Found', 404
 
             return response
@@ -221,7 +216,7 @@ def delete_file(file):
 
     try:
         os.remove(filepath)
-        remove_empty_parent_directories(filepath, os.environ.get("ART_DIRECTORY"))
+        remove_empty_parent_directories(filepath, art_dir)
 
         if os.path.exists(thumbnail_path):
             os.remove(thumbnail_path)
@@ -229,7 +224,6 @@ def delete_file(file):
     except OSError as error:
         print(f"[WARN] Failed to delete file {file}: {error}")
         return Response(json.dumps({'error': 'Failed to delete file'}), status=500, mimetype='application/json')
-
     return Response(json.dumps({'deleted': file}), mimetype='application/json')
 
 @app.route('/status')
