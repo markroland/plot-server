@@ -815,6 +815,20 @@ html[data-theme="dark"] #svg-object svg rect {
   color: var(--button-disabled-text);
 }
 
+#stop-plot-button {
+  background: var(--danger);
+  color: #fff;
+}
+
+#stop-plot-button:hover {
+  background: color-mix(in srgb, var(--danger) 82%, black);
+}
+
+#stop-plot-button:disabled {
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-text);
+}
+
 .plot-form {
   display: grid;
   gap: 0.8rem;
@@ -857,6 +871,21 @@ html[data-theme="dark"] #svg-object svg rect {
   display: grid;
   gap: 0.65rem;
   margin-top: 1rem;
+}
+
+.plotter-control-status {
+  min-height: 2.3rem;
+  max-height: 2.3rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, white 72%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
 
 .plotter-controls-section .eyebrow {

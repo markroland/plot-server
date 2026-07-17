@@ -10,6 +10,7 @@
 let busyPollingInterval = null;
 let plotRequestInFlight = false;
 let servoRequestInFlight = false;
+let stopRequestInFlight = false;
 
 // Global variables to store plotter and SVG data
 let currentPlotterData = null;
@@ -20,6 +21,7 @@ let currentPreviewObjectUrl = null;
 let isPlaybackActive = false;
 let plotCountdownInterval = null;
 let plotCountdownEndTimeMs = null;
+let preserveCountdownAfterStop = false;
 let previewLoadRequestId = 0;
 const INKSCAPE_NAMESPACE = 'http://www.inkscape.org/namespaces/inkscape';
 
@@ -51,25 +53,30 @@ function doesCurrentSvgFitPlotter() {
 function syncControlButtons() {
     const plotButton = document.querySelector('#submit_plot');
     const toggleButton = document.querySelector('#toggle-servo-button');
+    const stopButton = document.querySelector('#stop-plot-button');
 
-    if (!plotButton || !toggleButton) {
+    if (!plotButton || !toggleButton || !stopButton) {
         return;
     }
 
     const status = currentPlotterData?.status;
-    const requestInFlight = plotRequestInFlight || servoRequestInFlight;
+    const requestInFlight = plotRequestInFlight || servoRequestInFlight || stopRequestInFlight;
     const hasFile = hasSelectedFilename();
     const fitsPlotter = doesCurrentSvgFitPlotter();
+    const isPlotRunning = currentPlotterData?.plot_state === 'plotting' || plotRequestInFlight;
     const canPlot = status === 'on' && hasFile && fitsPlotter !== false && !requestInFlight;
     const canToggleServo = status === 'on' && !requestInFlight;
+    const canStopPlot = isPlotRunning && !stopRequestInFlight;
 
     plotButton.disabled = !canPlot;
     toggleButton.disabled = !canToggleServo;
+    stopButton.disabled = !canStopPlot;
 }
 
 function setBusyStatusLocally() {
     const fallbackData = {
         status: 'busy',
+        plot_state: 'plotting',
         machine: currentPlotterData?.machine || 'Unknown',
         config: currentPlotterData?.config || {},
     };
@@ -875,7 +882,7 @@ async function copyTextToClipboard(text) {
 }
 
 let copyPlotCommandTimeout = null;
-let toggleServoStatusTimeout = null;
+let plotterControlStatusTimeout = null;
 
 function showCopyPlotCommandStatus(message, isError = false) {
     const statusElement = document.querySelector('#copy-plot-command-status');
@@ -893,22 +900,26 @@ function showCopyPlotCommandStatus(message, isError = false) {
 }
 
 function showToggleServoStatus(message, isError = false) {
-    const statusElement = document.querySelector('#toggle-servo-status');
+    const statusElement = document.querySelector('#plotter-control-status');
     if (!statusElement) {
         return;
     }
 
     statusElement.textContent = message;
-    statusElement.className = isError ? 'copy-status copy-status-error' : 'copy-status';
+    statusElement.className = isError ? 'plotter-control-status copy-status copy-status-error' : 'plotter-control-status copy-status';
 
-    if (toggleServoStatusTimeout) {
-        clearTimeout(toggleServoStatusTimeout);
+    if (plotterControlStatusTimeout) {
+        clearTimeout(plotterControlStatusTimeout);
     }
 
-    toggleServoStatusTimeout = setTimeout(() => {
+    plotterControlStatusTimeout = setTimeout(() => {
         statusElement.textContent = '';
-        statusElement.className = '';
+        statusElement.className = 'plotter-control-status';
     }, 2500);
+}
+
+function showStopPlotStatus(message, isError = false) {
+    showToggleServoStatus(message, isError);
 }
 
 async function toggleServo() {
@@ -950,6 +961,57 @@ async function toggleServo() {
         showToggleServoStatus(error.message || 'Toggle failed', true);
     } finally {
         servoRequestInFlight = false;
+        await refreshPlotterStatus();
+    }
+}
+
+async function stopPlot() {
+    const stopButton = document.querySelector('#stop-plot-button');
+    if (!stopButton || stopButton.disabled) {
+        return;
+    }
+
+    stopRequestInFlight = true;
+    preserveCountdownAfterStop = true;
+    stopPlotCountdown(false);
+    syncControlButtons();
+    showStopPlotStatus('Stopping...');
+
+    try {
+        const response = await fetch('/plot/stop', { method: 'POST' });
+
+        if (response.status === 409) {
+            showStopPlotStatus('No active plot', true);
+            return;
+        }
+
+        if (!response.ok) {
+            let errorMessage = `Stop request failed (${response.status})`;
+            try {
+                const errorPayload = await response.json();
+                if (errorPayload && errorPayload.error) {
+                    errorMessage = errorPayload.error;
+                }
+            } catch (parseError) {
+                // Keep fallback error message when payload is not JSON.
+            }
+            throw new Error(errorMessage);
+        }
+
+        const payload = await response.json();
+        const servoState = payload?.stop_result?.servo_state || 'unknown';
+        if (servoState === 'commanded_up') {
+            showStopPlotStatus('Stop sent, pen up + motors off');
+        } else {
+            showStopPlotStatus('Stop sent', false);
+        }
+
+        await refreshPlotterStatus();
+    } catch (error) {
+        console.error('Failed to stop active plot:', error);
+        showStopPlotStatus(error.message || 'Stop failed', true);
+    } finally {
+        stopRequestInFlight = false;
         await refreshPlotterStatus();
     }
 }
@@ -1384,6 +1446,10 @@ document.querySelector('#toggle-servo-button').addEventListener('click', functio
     toggleServo();
 });
 
+document.querySelector('#stop-plot-button').addEventListener('click', function() {
+    stopPlot();
+});
+
 // Add event handler to Plot button
 document.querySelector('form[name=plot]').addEventListener("submit", function(event){
 
@@ -1461,6 +1527,7 @@ function send_plot_request(filename, layer = null){
         request += `?layer=${encodeURIComponent(layer)}`;
     }
 
+    preserveCountdownAfterStop = false;
     plotRequestInFlight = true;
     startPlotCountdown(currentPreviewEstimate?.plot_duration);
     setBusyStatusLocally();
@@ -1483,7 +1550,9 @@ function send_plot_request(filename, layer = null){
         })
         .finally(async () => {
             plotRequestInFlight = false;
-            stopPlotCountdown(true);
+            const shouldPreserveCountdown = preserveCountdownAfterStop;
+            preserveCountdownAfterStop = false;
+            stopPlotCountdown(!shouldPreserveCountdown);
             await refreshPlotterStatus();
         });
 }

@@ -11,6 +11,7 @@ from io import BytesIO
 import csv
 import json
 import threading
+import time
 from pyaxidraw import axidraw
 from flask import Flask, request, Response, render_template, send_file
 from flask_cors import CORS
@@ -32,6 +33,16 @@ load_dotenv()
 # Set up a Semaphore object for use with blocking plot
 # requests while the plotter is busy
 sem = threading.Semaphore()
+plot_state_lock = threading.Lock()
+runtime_plot_state = {
+    "is_plotting": False,
+    "stop_requested": False,
+    "last_stop": {
+        "requested_at": None,
+        "success": None,
+        "servo_state": "unknown",
+    },
+}
 
 # Create an AxiDraw class instance
 ad = axidraw.AxiDraw()
@@ -40,7 +51,7 @@ status_service = PlotterStatusService(status_ad, sem)
 
 # Create new Flask app
 app = Flask(__name__)
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 # Enable CORS
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -89,6 +100,69 @@ def load_csv_options(file_path):
 
 TOOL_OPTIONS = load_csv_options(TOOLS_CSV_PATH)
 MATERIAL_OPTIONS = load_csv_options(MATERIAL_CSV_PATH)
+
+
+def set_runtime_plot_state(*, is_plotting=None, stop_requested=None, last_stop=None):
+    """Update process-local plotting state used by API responses and controls."""
+    with plot_state_lock:
+        if is_plotting is not None:
+            runtime_plot_state["is_plotting"] = is_plotting
+        if stop_requested is not None:
+            runtime_plot_state["stop_requested"] = stop_requested
+        if last_stop is not None:
+            runtime_plot_state["last_stop"] = last_stop
+
+
+def get_runtime_plot_state_snapshot():
+    """Return a copy of the in-memory plotting state for response payloads."""
+    with plot_state_lock:
+        return {
+            "is_plotting": runtime_plot_state["is_plotting"],
+            "stop_requested": runtime_plot_state["stop_requested"],
+            "last_stop": dict(runtime_plot_state["last_stop"]),
+        }
+
+
+def apply_runtime_state_to_status(status_data):
+    """Merge local runtime controls into hardware status payload."""
+    runtime_state = get_runtime_plot_state_snapshot()
+
+    if runtime_state["is_plotting"]:
+        status_data["status"] = "busy"
+        status_data["plot_state"] = "plotting"
+    else:
+        status_data["plot_state"] = "idle"
+
+    status_data["stop_requested"] = runtime_state["stop_requested"]
+    status_data["last_stop"] = runtime_state["last_stop"]
+    return status_data
+
+
+def run_stop_cleanup_commands(model_number):
+    """Best-effort stop cleanup: command pen up first, then disable XY motors."""
+    stop_ad = axidraw.AxiDraw()
+
+    result = {
+        "raise_pen": False,
+        "disable_xy": False,
+        "servo_state": "unknown",
+    }
+
+    stop_ad.options.model = model_number
+    stop_ad.plot_setup()
+    stop_ad.options.preview = False
+    stop_ad.options.mode = "manual"
+
+    stop_ad.options.manual_cmd = "raise_pen"
+    stop_ad.plot_run()
+    result["raise_pen"] = True
+    result["servo_state"] = "commanded_up"
+
+    stop_ad.options.manual_cmd = "disable_xy"
+    stop_ad.plot_run()
+    result["disable_xy"] = True
+
+    return result
 
 
 def get_active_model_number():
@@ -189,12 +263,14 @@ def plot_request(file):
                 # Determine requested layer
                 layer = request.args.get("layer", default=0, type=int)
                 model_number = get_active_model_number()
+                set_runtime_plot_state(is_plotting=True, stop_requested=False)
                 plot(ad, filepath, layer, model_number)
                 response = 'Done: ' + str(layer)
             except Exception as e:
                 print(f"[ERROR] Exception during plot: {e}")
                 response = f'Error: {e}', 500
             finally:
+                set_runtime_plot_state(is_plotting=False)
                 sem.release()
         else:
             response = 'Busy', 503
@@ -280,7 +356,7 @@ def delete_file(file):
 @app.route('/status')
 def status():
     """Original status endpoint - returns plain text for backwards compatibility"""
-    status_data = status_service.get_plotter_status()
+    status_data = apply_runtime_state_to_status(status_service.get_plotter_status())
 
     # Return plain text status for backwards compatibility
     status_text = status_data["status"]
@@ -297,7 +373,7 @@ def status():
 @app.route('/status.json')
 def status_json():
     """JSON status endpoint - returns detailed machine info"""
-    status_data = status_service.get_plotter_status()
+    status_data = apply_runtime_state_to_status(status_service.get_plotter_status())
 
     response = Response(json.dumps(status_data), mimetype='application/json')
 
@@ -307,6 +383,47 @@ def status_json():
     response.headers['Expires'] = '0'
 
     return response
+
+
+@app.route('/plot/stop', methods=['POST'])
+def stop_plot():
+    """Best-effort plot interruption and cleanup commands."""
+    runtime_state = get_runtime_plot_state_snapshot()
+    if not runtime_state["is_plotting"]:
+        return Response(json.dumps({'error': 'No active plot'}), status=409, mimetype='application/json')
+
+    set_runtime_plot_state(stop_requested=True)
+
+    model_number = get_active_model_number()
+    stop_result = {
+        "requested_at": int(time.time()),
+        "success": False,
+        "servo_state": "unknown",
+        "raise_pen": False,
+        "disable_xy": False,
+        "error": None,
+    }
+
+    try:
+        command_result = run_stop_cleanup_commands(model_number)
+        stop_result.update(command_result)
+        stop_result["success"] = bool(command_result["raise_pen"] and command_result["disable_xy"])
+    except Exception as error:
+        print(f"[ERROR] Stop plot command failed: {error}")
+        stop_result["error"] = str(error)
+
+    set_runtime_plot_state(last_stop=stop_result)
+
+    if not stop_result["success"]:
+        return Response(json.dumps({
+            'error': stop_result["error"] or 'Failed to stop plot cleanly',
+            'stop_result': stop_result,
+        }), status=500, mimetype='application/json')
+
+    return Response(json.dumps({
+        'status': 'ok',
+        'stop_result': stop_result,
+    }), mimetype='application/json')
 
 
 @app.route('/servo/toggle', methods=['POST'])
