@@ -8,6 +8,8 @@
 
 // Polling interval ID
 let busyPollingInterval = null;
+let plotRequestInFlight = false;
+let servoRequestInFlight = false;
 
 // Global variables to store plotter and SVG data
 let currentPlotterData = null;
@@ -24,6 +26,67 @@ function setText(selector, value) {
     if (element) {
         element.textContent = value;
     }
+}
+
+function hasSelectedFilename() {
+    const filenameInput = document.querySelector('form[name=plot] input[name=filename]');
+    return Boolean(filenameInput && filenameInput.value);
+}
+
+function doesCurrentSvgFitPlotter() {
+    if (!currentSvgDimensions || !currentPlotterData?.config?.x_travel || !currentPlotterData?.config?.y_travel) {
+        return null;
+    }
+
+    const svgWidth = currentSvgDimensions.width;
+    const svgHeight = currentSvgDimensions.height;
+    const plotterWidth = currentPlotterData.config.x_travel * 25.4;
+    const plotterHeight = currentPlotterData.config.y_travel * 25.4;
+
+    return svgWidth <= plotterWidth && svgHeight <= plotterHeight;
+}
+
+function syncControlButtons() {
+    const plotButton = document.querySelector('#submit_plot');
+    const toggleButton = document.querySelector('#toggle-servo-button');
+
+    if (!plotButton || !toggleButton) {
+        return;
+    }
+
+    const status = currentPlotterData?.status;
+    const requestInFlight = plotRequestInFlight || servoRequestInFlight;
+    const hasFile = hasSelectedFilename();
+    const fitsPlotter = doesCurrentSvgFitPlotter();
+    const canPlot = status === 'on' && hasFile && fitsPlotter !== false && !requestInFlight;
+    const canToggleServo = status === 'on' && !requestInFlight;
+
+    plotButton.disabled = !canPlot;
+    toggleButton.disabled = !canToggleServo;
+}
+
+function setBusyStatusLocally() {
+    const fallbackData = {
+        status: 'busy',
+        machine: currentPlotterData?.machine || 'Unknown',
+        config: currentPlotterData?.config || {},
+    };
+
+    updatePlotterStatus({ ...currentPlotterData, ...fallbackData });
+}
+
+async function refreshPlotterStatus() {
+    try {
+        const statusResponse = await fetch('/status.json', { cache: 'no-store' });
+        if (statusResponse.ok) {
+            updatePlotterStatus(await statusResponse.json());
+            return;
+        }
+    } catch (error) {
+        console.error('Failed to refresh plotter status:', error);
+    }
+
+    syncControlButtons();
 }
 
 function setSvgSourceText(svgMarkup) {
@@ -283,6 +346,7 @@ function clearSelectedPlotState() {
     document.querySelector('#plotter-fit').className = 'info-tile__meta';
     resetPreviewEstimate('-');
     updatePlotCommand();
+    syncControlButtons();
 }
 
 async function deleteSelectedFile() {
@@ -739,7 +803,9 @@ async function toggleServo() {
         return;
     }
 
-    toggleButton.disabled = true;
+    servoRequestInFlight = true;
+    setBusyStatusLocally();
+    syncControlButtons();
     showToggleServoStatus('Toggling...');
 
     try {
@@ -764,15 +830,13 @@ async function toggleServo() {
 
         showToggleServoStatus('Servo toggled');
 
-        const statusResponse = await fetch('/status.json', { cache: 'no-store' });
-        if (statusResponse.ok) {
-            updatePlotterStatus(await statusResponse.json());
-        }
+        await refreshPlotterStatus();
     } catch (error) {
         console.error('Failed to toggle servo:', error);
         showToggleServoStatus(error.message || 'Toggle failed', true);
     } finally {
-        toggleButton.disabled = false;
+        servoRequestInFlight = false;
+        await refreshPlotterStatus();
     }
 }
 
@@ -786,13 +850,11 @@ xhr.onload = function() {
         // Update status display
         updatePlotterStatus(plotterData);
 
-        // Enable plot buttons if plotter is ready
-        if (plotterData.status === "on") {
-            document.querySelector("#submit_plot").disabled = false;
-        }
+        syncControlButtons();
     } else {
         console.log("Error: " + xhr.status);
         setText("#plotter-status-chip", "Error");
+        syncControlButtons();
     }
 };
 xhr.send();
@@ -807,7 +869,7 @@ function updatePlotterStatus(data) {
     let color = "black";
     if (data.status === 'busy') {
         statusText = 'Busy';
-        color = '#ff851b'; // orange
+        color = '#7f3fbf'; // purple
         // Start polling if not already polling
         if (!busyPollingInterval) {
             busyPollingInterval = setInterval(() => {
@@ -851,6 +913,7 @@ function updatePlotterStatus(data) {
 
     // Check SVG fit if we have SVG dimensions
     checkSvgFit();
+    syncControlButtons();
 }
 
 // Function to extract SVG dimensions
@@ -898,7 +961,8 @@ function extractSvgDimensions(svgDocument) {
 
 // Function to check if SVG fits within plotter bounds
 function checkSvgFit() {
-    if (!currentSvgDimensions || !currentPlotterData?.config?.x_travel || !currentPlotterData?.config?.y_travel) {
+    const fits = doesCurrentSvgFitPlotter();
+    if (fits === null) {
         const fitElement = document.querySelector("#plotter-fit");
         fitElement.textContent = "Plotter Fit: NA";
         fitElement.className = "";
@@ -907,13 +971,10 @@ function checkSvgFit() {
 
     const svgWidth = currentSvgDimensions.width;
     const svgHeight = currentSvgDimensions.height;
-    // Convert plotter travel dimensions from inches to mm (1 inch = 25.4 mm)
     const plotterWidth = currentPlotterData.config.x_travel * 25.4;
     const plotterHeight = currentPlotterData.config.y_travel * 25.4;
-
     const fitsWidth = svgWidth <= plotterWidth;
     const fitsHeight = svgHeight <= plotterHeight;
-    const fits = fitsWidth && fitsHeight;
 
     let fitText = "";
     let fitClass = "";
@@ -932,14 +993,6 @@ function checkSvgFit() {
     const fitElement = document.querySelector("#plotter-fit");
     fitElement.textContent = fitText;
     fitElement.className = fitClass;
-
-    // Disable plot button if SVG doesn't fit, but only enable if plotter is also ready
-    const plotButton = document.querySelector("#submit_plot");
-    if (!fits) {
-        plotButton.disabled = true;
-    } else if (currentPlotterData && currentPlotterData.status === "on") {
-        plotButton.disabled = false;
-    }
 }
 
 function analyzeLoadedSvg(filename, availableLayers = null, selectedLayerValue = '') {
@@ -993,6 +1046,7 @@ function analyzeLoadedSvg(filename, availableLayers = null, selectedLayerValue =
     select_menu.value = hasSelectedLayer ? selectedLayerValue : '';
 
     updatePlotCommand();
+    syncControlButtons();
 }
 
 async function loadAnimatedPreview(filepath, filename, selectedLayerValue = '') {
@@ -1229,7 +1283,11 @@ document.querySelector('form[name=plot]').addEventListener("submit", function(ev
     }
 
     // Set plot request
-    send_plot_request(filename, layer);
+    send_plot_request(filename, layer)
+        .catch((error) => {
+            console.error('Failed to start plot request:', error);
+            window.alert(error.message || 'Failed to start plot');
+        });
 
     event.preventDefault();
 });
@@ -1288,12 +1346,28 @@ function send_plot_request(filename, layer = null){
     if (layer != null) {
         request += `?layer=${encodeURIComponent(layer)}`;
     }
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', request);
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            console.log(xhr.responseText);
-        }
-    };
-    xhr.send();
+
+    plotRequestInFlight = true;
+    setBusyStatusLocally();
+    syncControlButtons();
+
+    return fetch(request, { cache: 'no-store' })
+        .then(async (response) => {
+            if (response.status === 503) {
+                throw new Error('Plotter is busy');
+            }
+
+            if (!response.ok) {
+                const details = await response.text();
+                throw new Error(details || `Plot request failed (${response.status})`);
+            }
+
+            const message = await response.text();
+            console.log(message);
+            return message;
+        })
+        .finally(async () => {
+            plotRequestInFlight = false;
+            await refreshPlotterStatus();
+        });
 }
