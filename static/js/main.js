@@ -18,6 +18,8 @@ let currentPreviewEstimate = null;
 let currentAnimator = null;
 let currentPreviewObjectUrl = null;
 let isPlaybackActive = false;
+let plotCountdownInterval = null;
+let plotCountdownEndTimeMs = null;
 let previewLoadRequestId = 0;
 const INKSCAPE_NAMESPACE = 'http://www.inkscape.org/namespaces/inkscape';
 
@@ -331,6 +333,7 @@ function clearSelectedPlotState() {
     previewElement.innerHTML = '';
     currentSvgDimensions = null;
     currentPreviewEstimate = null;
+    stopPlotCountdown(true);
     setSvgSourceText('');
 
     if (currentAnimator) {
@@ -496,20 +499,131 @@ function formatMeters(value) {
     return `${value.toFixed(2)} m`;
 }
 
+function formatCountdown(totalSeconds) {
+    const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const seconds = safeSeconds % 60;
+
+    return [hours, minutes, seconds]
+        .map((part) => String(part).padStart(2, '0'))
+        .join(':');
+}
+
+function formatCompactDuration(totalSeconds) {
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+        return null;
+    }
+
+    if (totalSeconds >= 3600) {
+        const hoursValue = totalSeconds / 3600;
+        const roundedHours = Number(hoursValue.toFixed(1));
+        return `${roundedHours}h`;
+    }
+
+    if (totalSeconds >= 60) {
+        return `${Math.ceil(totalSeconds / 60)}m`;
+    }
+
+    return `${Math.ceil(totalSeconds)}s`;
+}
+
+function getBusyDurationSeconds() {
+    if (plotCountdownEndTimeMs) {
+        return Math.max(0, Math.ceil((plotCountdownEndTimeMs - Date.now()) / 1000));
+    }
+
+    const estimatedDuration = Number(currentPreviewEstimate?.plot_duration);
+    if (Number.isFinite(estimatedDuration) && estimatedDuration > 0) {
+        return Math.ceil(estimatedDuration);
+    }
+
+    return null;
+}
+
+function buildStatusChipText(statusText, rawStatus) {
+    if (rawStatus !== 'busy') {
+        return statusText;
+    }
+
+    const compactDuration = formatCompactDuration(getBusyDurationSeconds());
+    return compactDuration ? `${statusText} ${compactDuration}` : statusText;
+}
+
+function setCountdownValue(value, isActive = false) {
+    const countdownElement = document.querySelector('#preview-countdown');
+    if (!countdownElement) {
+        return;
+    }
+
+    countdownElement.textContent = value;
+    countdownElement.classList.toggle('is-active', isActive);
+
+    if (currentPlotterData?.status === 'busy') {
+        const statusChip = document.querySelector('#plotter-status-chip');
+        if (statusChip) {
+            statusChip.textContent = buildStatusChipText('Busy', 'busy');
+        }
+    }
+}
+
+function stopPlotCountdown(resetToZero = false) {
+    if (plotCountdownInterval) {
+        clearInterval(plotCountdownInterval);
+        plotCountdownInterval = null;
+    }
+
+    plotCountdownEndTimeMs = null;
+
+    if (resetToZero) {
+        setCountdownValue('00:00:00', false);
+    } else {
+        const currentValue = document.querySelector('#preview-countdown')?.textContent || '00:00:00';
+        setCountdownValue(currentValue, false);
+    }
+}
+
+function startPlotCountdown(totalSeconds) {
+    const numericSeconds = Number(totalSeconds);
+
+    if (!Number.isFinite(numericSeconds) || numericSeconds <= 0) {
+        stopPlotCountdown(true);
+        return;
+    }
+
+    stopPlotCountdown();
+    plotCountdownEndTimeMs = Date.now() + (numericSeconds * 1000);
+    setCountdownValue(formatCountdown(numericSeconds), true);
+
+    plotCountdownInterval = setInterval(() => {
+        const remainingSeconds = Math.ceil((plotCountdownEndTimeMs - Date.now()) / 1000);
+        setCountdownValue(formatCountdown(remainingSeconds), true);
+
+        if (remainingSeconds <= 0) {
+            clearInterval(plotCountdownInterval);
+            plotCountdownInterval = null;
+            setCountdownValue('00:00:00', true);
+        }
+    }, 250);
+}
+
 function resetPreviewEstimate(message = 'Loading') {
     currentPreviewEstimate = null;
     const durationElement = document.querySelector('#preview-duration');
     durationElement.textContent = message;
     durationElement.className = 'preview-metric__value';
+    stopPlotCountdown(true);
     setText('#preview-path', message);
     setText('#preview-travel', message);
 }
 
 function renderPreviewEstimate(data) {
     currentPreviewEstimate = data;
+    const estimatedDurationSeconds = Number(data.plot_duration);
     const durationElement = document.querySelector('#preview-duration');
-    durationElement.textContent = formatDurationFromSeconds(Number(data.plot_duration));
+    durationElement.textContent = formatDurationFromSeconds(estimatedDurationSeconds);
     durationElement.className = 'preview-metric__value';
+    setCountdownValue(formatCountdown(estimatedDurationSeconds), false);
     setText('#preview-path', formatMeters(Number(data.plot_path)));
     setText('#preview-travel', formatMeters(Number(data.plot_travel)));
 }
@@ -905,7 +1019,7 @@ function updatePlotterStatus(data) {
         }
     }
 
-    setText("#plotter-status-chip", statusText);
+    setText("#plotter-status-chip", buildStatusChipText(statusText, data.status));
     document.querySelector("#plotter-status-chip").style.color = color;
 
     // Machine information
@@ -1348,6 +1462,7 @@ function send_plot_request(filename, layer = null){
     }
 
     plotRequestInFlight = true;
+    startPlotCountdown(currentPreviewEstimate?.plot_duration);
     setBusyStatusLocally();
     syncControlButtons();
 
@@ -1368,6 +1483,7 @@ function send_plot_request(filename, layer = null){
         })
         .finally(async () => {
             plotRequestInFlight = false;
+            stopPlotCountdown(true);
             await refreshPlotterStatus();
         });
 }

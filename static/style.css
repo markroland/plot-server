@@ -367,6 +367,35 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.plot-countdown {
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.2rem 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.plot-countdown__label {
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.plot-countdown__value {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.02rem;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.plot-countdown__value.is-active {
+  color: var(--action);
+  font-weight: 700;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 320px);

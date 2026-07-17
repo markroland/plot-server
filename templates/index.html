@@ -198,6 +198,10 @@
 
                         <input type="hidden" name="filename" value="" />
                         <button id="submit_plot" type="submit" disabled title="Plotter not ready">Plot</button>
+                        <div class="plot-countdown" aria-live="polite">
+                            <span class="plot-countdown__label">Plot Time</span>
+                            <span id="preview-countdown" class="plot-countdown__value">00:00:00</span>
+                        </div>
                     </form>
                     <details>
                         <summary>Plot Command</summary>
