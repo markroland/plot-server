@@ -23,6 +23,8 @@ let plotCountdownInterval = null;
 let plotCountdownEndTimeMs = null;
 let preserveCountdownAfterStop = false;
 let previewLoadRequestId = 0;
+let plotLogEntries = [];
+let activePlotLogEntryId = null;
 const INKSCAPE_NAMESPACE = 'http://www.inkscape.org/namespaces/inkscape';
 
 function setText(selector, value) {
@@ -506,6 +508,215 @@ function formatMeters(value) {
     return `${value.toFixed(2)} m`;
 }
 
+function formatCompactTimestamp(unixSeconds = null) {
+    const dateValue = Number.isFinite(Number(unixSeconds))
+        ? new Date(Number(unixSeconds) * 1000)
+        : new Date();
+
+    const year = String(dateValue.getFullYear());
+    const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+    const day = String(dateValue.getDate()).padStart(2, '0');
+    const hours = String(dateValue.getHours()).padStart(2, '0');
+    const minutes = String(dateValue.getMinutes()).padStart(2, '0');
+    const seconds = String(dateValue.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function formatDurationClock(totalSeconds) {
+    if (!Number.isFinite(Number(totalSeconds)) || Number(totalSeconds) < 0) {
+        return '-';
+    }
+
+    const safeSeconds = Math.floor(Number(totalSeconds));
+    const hours = Math.floor(safeSeconds / 3600);
+    const minutes = Math.floor((safeSeconds % 3600) / 60);
+    const seconds = safeSeconds % 60;
+
+    return [hours, minutes, seconds]
+        .map((part) => String(part).padStart(2, '0'))
+        .join(':');
+}
+
+function getCurrentPlotContext(filename, layer) {
+    const titleValue = document.querySelector('input[name=title]')?.value || '';
+    const toolValue = document.querySelector('select[name=tool]')?.value || 'None';
+    const materialValue = document.querySelector('select[name=material]')?.value || 'None';
+    const selectedLayer = (layer ?? document.querySelector('select[name=layer]')?.value ?? '');
+    const selectedFilename = filename || document.querySelector('form[name=plot] input[name=filename]')?.value || '';
+
+    const orientation = currentSvgDimensions && currentSvgDimensions.width > currentSvgDimensions.height
+        ? 'Landscape'
+        : 'Portrait';
+
+    let formatValue = '';
+    if (currentSvgDimensions) {
+        const widthInches = currentSvgDimensions.width / 25.4;
+        const heightInches = currentSvgDimensions.height / 25.4;
+        const formatDimension = (value) => {
+            const fixed = value.toFixed(1);
+            return fixed.endsWith('.0') ? fixed.slice(0, -2) : fixed;
+        };
+        formatValue = `${formatDimension(widthInches)}x${formatDimension(heightInches)}`;
+    }
+
+    return {
+        title: titleValue,
+        filename: selectedFilename,
+        tool: toolValue,
+        media: materialValue,
+        format: formatValue,
+        orientation,
+        layer: selectedLayer || 'all',
+        edition: 1,
+        editions: 1,
+        plotter: currentPlotterData?.machine || 'Unknown',
+    };
+}
+
+function getStatusClass(status) {
+    const value = String(status || '').toLowerCase();
+    if (value === 'ok') {
+        return 'status-ok';
+    }
+    if (value === 'error' || value === 'stopped') {
+        return 'status-error';
+    }
+    if (value === 'plotting' || value === 'stopping') {
+        return 'status-started';
+    }
+    return '';
+}
+
+function formatLogCellValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    return String(value);
+}
+
+function updatePlotLogUi() {
+    const emptyElement = document.querySelector('#plot-log-empty');
+    const tableElement = document.querySelector('#plot-log-table');
+    const bodyElement = document.querySelector('#plot-log-body');
+
+    if (!emptyElement || !tableElement || !bodyElement) {
+        return;
+    }
+
+    if (plotLogEntries.length === 0) {
+        emptyElement.hidden = false;
+        tableElement.hidden = true;
+        bodyElement.innerHTML = '';
+        return;
+    }
+
+    emptyElement.hidden = true;
+    tableElement.hidden = false;
+
+    bodyElement.innerHTML = plotLogEntries.map((entry) => {
+        const statusClass = getStatusClass(entry.status);
+        return `
+            <tr>
+                <td>${formatLogCellValue(entry.time)}</td>
+                <td class="${statusClass}">${formatLogCellValue(entry.status)}</td>
+                <td>${formatLogCellValue(entry.title)}</td>
+                <td>${formatLogCellValue(entry.filename)}</td>
+                <td>${formatLogCellValue(entry.fileHash)}</td>
+                <td>${formatLogCellValue(entry.plotter)}</td>
+                <td>${formatLogCellValue(entry.edition)}</td>
+                <td>${formatLogCellValue(entry.layer)}</td>
+                <td>${formatLogCellValue(entry.tool)}</td>
+                <td>${formatLogCellValue(entry.media)}</td>
+                <td>${formatLogCellValue(entry.format)}</td>
+                <td>${formatLogCellValue(entry.orientation)}</td>
+                <td>${formatLogCellValue(entry.duration)}</td>
+                <td>${formatLogCellValue(entry.path)}</td>
+                <td>${formatLogCellValue(entry.travel)}</td>
+                <td>${formatLogCellValue(entry.lifts)}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function addPlotLogEntry(entry) {
+    plotLogEntries.unshift(entry);
+    if (plotLogEntries.length > 75) {
+        plotLogEntries = plotLogEntries.slice(0, 75);
+    }
+    updatePlotLogUi();
+}
+
+function updatePlotLogEntry(entryId, patch) {
+    if (!entryId) {
+        return;
+    }
+
+    const entryIndex = plotLogEntries.findIndex((entry) => entry.clientLogId === entryId);
+    if (entryIndex < 0) {
+        return;
+    }
+
+    plotLogEntries[entryIndex] = {
+        ...plotLogEntries[entryIndex],
+        ...patch,
+    };
+    updatePlotLogUi();
+}
+
+function normalizePersistedLogEntry(entry) {
+    const durationValue = Number(entry?.duration);
+    const pathValue = Number(entry?.path);
+    const travelValue = Number(entry?.travel);
+
+    return {
+        ...entry,
+        duration: Number.isFinite(durationValue) ? formatDurationClock(durationValue) : (entry?.duration || '-'),
+        path: Number.isFinite(pathValue) ? pathValue.toFixed(2) : (entry?.path || '-'),
+        travel: Number.isFinite(travelValue) ? travelValue.toFixed(2) : (entry?.travel || '-'),
+    };
+}
+
+async function loadPersistedPlotLog() {
+    try {
+        const response = await fetch('/logs.json', { cache: 'no-store' });
+        if (!response.ok) {
+            return;
+        }
+
+        const payload = await response.json();
+        const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+        plotLogEntries = entries.slice(0, 75).map(normalizePersistedLogEntry);
+        updatePlotLogUi();
+    } catch (error) {
+        console.error('Failed to load persisted plot log:', error);
+    }
+}
+
+function initializePlotLog() {
+    const clearButton = document.querySelector('#clear-plot-log');
+    if (clearButton) {
+        clearButton.addEventListener('click', async function() {
+            const confirmed = window.confirm('Clear all plot log entries? This cannot be undone.');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                await fetch('/logs.json', { method: 'DELETE' });
+            } catch (error) {
+                console.error('Failed to clear persisted plot log:', error);
+            }
+
+            plotLogEntries = [];
+            updatePlotLogUi();
+        });
+    }
+
+    loadPersistedPlotLog();
+}
+
 function formatCountdown(totalSeconds) {
     const safeSeconds = Math.max(0, Math.floor(totalSeconds));
     const hours = Math.floor(safeSeconds / 3600);
@@ -976,6 +1187,11 @@ async function stopPlot() {
     stopPlotCountdown(false);
     syncControlButtons();
     showStopPlotStatus('Stopping...');
+    addPlotLogEntry({
+        time: formatCompactTimestamp(),
+        status: 'stopping',
+        ...getCurrentPlotContext(),
+    });
 
     try {
         const response = await fetch('/plot/stop', { method: 'POST' });
@@ -1006,10 +1222,21 @@ async function stopPlot() {
             showStopPlotStatus('Stop sent', false);
         }
 
+        addPlotLogEntry({
+            time: formatCompactTimestamp(payload?.stop_result?.requested_at),
+            status: 'stopped',
+            ...getCurrentPlotContext(),
+        });
+
         await refreshPlotterStatus();
     } catch (error) {
         console.error('Failed to stop active plot:', error);
         showStopPlotStatus(error.message || 'Stop failed', true);
+        addPlotLogEntry({
+            time: formatCompactTimestamp(),
+            status: 'error',
+            ...getCurrentPlotContext(),
+        });
     } finally {
         stopRequestInFlight = false;
         await refreshPlotterStatus();
@@ -1479,6 +1706,7 @@ window.addEventListener("load", function() {
     initializePlaybackControls();
     initializeInfoModal();
     initializeFileThumbnails();
+    initializePlotLog();
     const urlParams = new URLSearchParams(window.location.search);
     let plotParam = urlParams.get('plot');
     let layerParam = urlParams.get('layer') || '';
@@ -1488,7 +1716,7 @@ window.addEventListener("load", function() {
         let plotLink = Array.from(document.querySelectorAll('ol#files li a')).find(a => a.getAttribute('data-filename') === plotParam);
         if (plotLink) {
             let filename = plotLink.getAttribute('data-filename');
-            let filepath = "/static/uploads/" + filename;
+            let filepath = buildSvgAssetPath(filename);
             setSelectedPlot(filename);
             loadAnimatedPreview(filepath, filename, layerParam);
             // Highlight the selected item
@@ -1502,7 +1730,7 @@ window.addEventListener("load", function() {
         let first_plot = document.querySelector('ol#files li a');
         if (first_plot) {
             let filename = first_plot.getAttribute('data-filename');
-            let filepath = "/static/uploads/" + filename;
+            let filepath = buildSvgAssetPath(filename);
             setSelectedPlot(filename);
             loadAnimatedPreview(filepath, filename, layerParam);
             first_plot.parentElement.classList.add('selected');
@@ -1522,16 +1750,43 @@ document.querySelector('#library-search').addEventListener('input', function(eve
 
 // Send an API request to start a plot
 function send_plot_request(filename, layer = null){
-    let request = buildPlotRequestPath(filename);
+    const context = getCurrentPlotContext(filename, layer);
+    const clientLogId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    activePlotLogEntryId = clientLogId;
+    const requestParams = new URLSearchParams();
     if (layer != null) {
-        request += `?layer=${encodeURIComponent(layer)}`;
+        requestParams.set('layer', String(layer));
     }
+
+    requestParams.set('title', context.title || '');
+    requestParams.set('tool', context.tool || 'None');
+    requestParams.set('media', context.media || 'None');
+    requestParams.set('format', context.format || '');
+    requestParams.set('orientation', context.orientation || '');
+    requestParams.set('edition', String(context.edition || 1));
+    requestParams.set('editions', String(context.editions || 1));
+
+    const requestQuery = requestParams.toString();
+    const request = requestQuery
+        ? `${buildPlotRequestPath(filename)}?${requestQuery}`
+        : buildPlotRequestPath(filename);
 
     preserveCountdownAfterStop = false;
     plotRequestInFlight = true;
     startPlotCountdown(currentPreviewEstimate?.plot_duration);
     setBusyStatusLocally();
     syncControlButtons();
+
+    addPlotLogEntry({
+        clientLogId,
+        time: formatCompactTimestamp(Math.floor(Date.now() / 1000)),
+        status: 'plotting',
+        ...context,
+        duration: '-',
+        path: '-',
+        travel: '-',
+        lifts: '-',
+    });
 
     return fetch(request, { cache: 'no-store' })
         .then(async (response) => {
@@ -1544,11 +1799,49 @@ function send_plot_request(filename, layer = null){
                 throw new Error(details || `Plot request failed (${response.status})`);
             }
 
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const payload = await response.json();
+                const metrics = payload?.metrics || {};
+                updatePlotLogEntry(clientLogId, {
+                    status: 'ok',
+                    title: payload?.title || context.title,
+                    filename: payload?.filename || context.filename,
+                    fileHash: payload?.file_hash || '-',
+                    plotter: payload?.plotter || context.plotter,
+                    edition: `${payload?.edition || context.edition || 1}/${payload?.editions || context.editions || 1}`,
+                    layer: payload?.layer > 0 ? String(payload.layer) : context.layer,
+                    tool: payload?.tool || context.tool,
+                    media: payload?.media || context.media,
+                    format: payload?.format || context.format,
+                    orientation: payload?.orientation || context.orientation,
+                    duration: formatDurationClock(metrics.plot_duration),
+                    path: Number.isFinite(Number(metrics.plot_path)) ? Number(metrics.plot_path).toFixed(2) : '-',
+                    travel: Number.isFinite(Number(metrics.plot_travel)) ? Number(metrics.plot_travel).toFixed(2) : '-',
+                    lifts: Number.isFinite(Number(metrics.lifts)) ? String(metrics.lifts) : '-',
+                });
+                return payload;
+            }
+
             const message = await response.text();
+            updatePlotLogEntry(clientLogId, {
+                status: 'ok',
+                ...getCurrentPlotContext(filename, layer),
+            });
             console.log(message);
             return message;
         })
+        .catch((error) => {
+            updatePlotLogEntry(clientLogId, {
+                status: 'error',
+                ...getCurrentPlotContext(filename, layer),
+            });
+            throw error;
+        })
         .finally(async () => {
+            if (activePlotLogEntryId === clientLogId) {
+                activePlotLogEntryId = null;
+            }
             plotRequestInFlight = false;
             const shouldPreserveCountdown = preserveCountdownAfterStop;
             preserveCountdownAfterStop = false;

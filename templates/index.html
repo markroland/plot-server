@@ -263,6 +263,42 @@
                     </div>
                 </section>
             </aside>
+
+            <section class="log-panel card" aria-label="Plot log">
+                <div class="panel-heading compact">
+                    <div>
+                        <p class="eyebrow">Plot Log</p>
+                        <h2>Recent Activity</h2>
+                    </div>
+                    <button id="clear-plot-log" type="button" class="clear-log-button">Clear</button>
+                </div>
+                <div id="plot-log-empty" class="plot-log-empty">No log entries yet.</div>
+                <div class="plot-log-table-wrap">
+                    <table class="plot-log-table" id="plot-log-table" hidden>
+                        <thead>
+                            <tr>
+                                <th scope="col">Time</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Title</th>
+                                <th scope="col">Filename</th>
+                                <th scope="col">File Hash</th>
+                                <th scope="col">Plotter</th>
+                                <th scope="col">Edition</th>
+                                <th scope="col">Layer</th>
+                                <th scope="col">Tool</th>
+                                <th scope="col">Media</th>
+                                <th scope="col">Format</th>
+                                <th scope="col">Orientation</th>
+                                <th scope="col">Duration</th>
+                                <th scope="col">Path (m)</th>
+                                <th scope="col">Travel (m)</th>
+                                <th scope="col">Lifts</th>
+                            </tr>
+                        </thead>
+                        <tbody id="plot-log-body"></tbody>
+                    </table>
+                </div>
+            </section>
         </main>
 
         <footer class="app-footer">
@@ -304,7 +340,7 @@
         </div>
     </div>
 
-    <script src="/static/js/main.js"></script>
+    <script src="/static/js/main.js?v={{ app_version }}"></script>
 
 </body>
 </html>

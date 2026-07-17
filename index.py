@@ -9,6 +9,7 @@
 from dotenv import load_dotenv
 from io import BytesIO
 import csv
+import hashlib
 import json
 import threading
 import time
@@ -18,7 +19,7 @@ from flask_cors import CORS
 import os
 from plotter_service import plot, preview_plot, toggle_servo
 from plotter_status import PlotterStatusService
-from preview_parser import parse_preview_output
+from preview_parser import parse_plot_output, parse_preview_output
 from svg_library import (
     build_file_entry,
     build_thumbnail_relative_path,
@@ -51,7 +52,7 @@ status_service = PlotterStatusService(status_ad, sem)
 
 # Create new Flask app
 app = Flask(__name__)
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 # Enable CORS
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -63,9 +64,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
 art_dir = app.config['UPLOAD_FOLDER']
+LOG_DIR = os.path.join(BASE_DIR, 'log')
+PLOT_LOG_FILE = os.path.join(LOG_DIR, 'plot-log.jsonl')
 
 TOOLS_CSV_PATH = os.path.join(BASE_DIR, 'tools.csv')
 MATERIAL_CSV_PATH = os.path.join(BASE_DIR, 'material.csv')
+plot_log_file_lock = threading.Lock()
 
 
 def load_csv_options(file_path):
@@ -206,6 +210,58 @@ def get_file_added_timestamp(path):
     file_stats = os.stat(path)
     return getattr(file_stats, 'st_birthtime', file_stats.st_mtime)
 
+
+def calculate_file_md5(path):
+    """Calculate a file md5 hash for logging and traceability."""
+    file_hash = hashlib.md5()
+    with open(path, 'rb') as file_handle:
+        for chunk in iter(lambda: file_handle.read(8192), b''):
+            file_hash.update(chunk)
+    return file_hash.hexdigest()
+
+
+def format_log_timestamp(timestamp):
+    """Return a stable local timestamp format for log rows."""
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(timestamp))
+
+
+def append_plot_log_entry(entry):
+    """Append one JSON log entry to disk so log history survives restarts."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    with plot_log_file_lock:
+        with open(PLOT_LOG_FILE, 'a', encoding='utf-8') as log_file:
+            log_file.write(json.dumps(entry, ensure_ascii=True) + '\n')
+
+
+def load_plot_log_entries(limit=300):
+    """Load persisted plot log entries from disk (newest first)."""
+    if not os.path.exists(PLOT_LOG_FILE):
+        return []
+
+    entries = []
+    with plot_log_file_lock:
+        with open(PLOT_LOG_FILE, 'r', encoding='utf-8') as log_file:
+            for line in log_file:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+
+    return list(reversed(entries[-limit:]))
+
+
+def clear_plot_log_entries():
+    """Clear persisted plot log entries."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    with plot_log_file_lock:
+        with open(PLOT_LOG_FILE, 'w', encoding='utf-8') as log_file:
+            log_file.write('')
+
 # Define route: Default
 @app.route('/')
 def index():
@@ -262,10 +318,70 @@ def plot_request(file):
 
                 # Determine requested layer
                 layer = request.args.get("layer", default=0, type=int)
+                title = request.args.get('title', default='', type=str)
+                tool = request.args.get('tool', default='None', type=str)
+                media = request.args.get('media', default='None', type=str)
+                format_value = request.args.get('format', default='', type=str)
+                orientation = request.args.get('orientation', default='', type=str)
+                edition = request.args.get('edition', default=1, type=int)
+                editions = request.args.get('editions', default=1, type=int)
                 model_number = get_active_model_number()
                 set_runtime_plot_state(is_plotting=True, stop_requested=False)
-                plot(ad, filepath, layer, model_number)
-                response = 'Done: ' + str(layer)
+                started_at = int(time.time())
+                plot_output = plot(ad, filepath, layer, model_number)
+                completed_at = int(time.time())
+
+                try:
+                    plot_metrics = parse_plot_output(plot_output)
+                except ValueError:
+                    plot_metrics = {
+                        'plot_duration': max(0, completed_at - started_at),
+                        'plot_path': 0.0,
+                        'plot_travel': 0.0,
+                        'lifts': 0,
+                    }
+
+                response_payload = {
+                    'status': 'ok',
+                    'layer': layer,
+                    'title': title,
+                    'file': file,
+                    'filepath': filepath,
+                    'filename': os.path.basename(filepath),
+                    'file_hash': calculate_file_md5(filepath),
+                    'plotter': status_service.get_plotter_name(),
+                    'tool': tool,
+                    'media': media,
+                    'format': format_value,
+                    'orientation': orientation,
+                    'edition': edition,
+                    'editions': editions,
+                    'model_number': model_number,
+                    'started_at': started_at,
+                    'completed_at': completed_at,
+                    'metrics': plot_metrics,
+                }
+
+                append_plot_log_entry({
+                    'time': format_log_timestamp(completed_at),
+                    'status': 'ok',
+                    'title': title,
+                    'filename': response_payload['filename'],
+                    'fileHash': response_payload['file_hash'],
+                    'plotter': response_payload['plotter'],
+                    'edition': f"{edition}/{editions}",
+                    'layer': str(layer) if layer and layer > 0 else 'all',
+                    'tool': tool,
+                    'media': media,
+                    'format': format_value,
+                    'orientation': orientation,
+                    'duration': plot_metrics.get('plot_duration', 0),
+                    'path': plot_metrics.get('plot_path', 0.0),
+                    'travel': plot_metrics.get('plot_travel', 0.0),
+                    'lifts': plot_metrics.get('lifts', 0),
+                })
+
+                response = Response(json.dumps(response_payload), mimetype='application/json')
             except Exception as e:
                 print(f"[ERROR] Exception during plot: {e}")
                 response = f'Error: {e}', 500
@@ -385,6 +501,16 @@ def status_json():
     return response
 
 
+@app.route('/logs.json', methods=['GET', 'DELETE'])
+def logs_json():
+    """Read or clear persisted plot log entries."""
+    if request.method == 'DELETE':
+        clear_plot_log_entries()
+        return Response(json.dumps({'status': 'ok'}), mimetype='application/json')
+
+    return Response(json.dumps({'entries': load_plot_log_entries()}), mimetype='application/json')
+
+
 @app.route('/plot/stop', methods=['POST'])
 def stop_plot():
     """Best-effort plot interruption and cleanup commands."""
@@ -413,6 +539,26 @@ def stop_plot():
         stop_result["error"] = str(error)
 
     set_runtime_plot_state(last_stop=stop_result)
+
+    append_plot_log_entry({
+        'time': format_log_timestamp(stop_result['requested_at']),
+        'status': 'stopped' if stop_result['success'] else 'error',
+        'title': '',
+        'filename': '',
+        'file': '',
+        'fileHash': '-',
+        'plotter': status_service.get_plotter_name(),
+        'edition': '-',
+        'layer': '-',
+        'tool': '-',
+        'media': '-',
+        'format': '-',
+        'orientation': '-',
+        'duration': '-',
+        'path': '-',
+        'travel': '-',
+        'lifts': '-',
+    })
 
     if not stop_result["success"]:
         return Response(json.dumps({

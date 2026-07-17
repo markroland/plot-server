@@ -4,23 +4,54 @@ import io
 
 def plot(ad, filepath, layer=0, model_number=4):
     """Plot an SVG file, optionally restricted to a single numbered layer."""
-    ad.options.model = model_number
-    ad.plot_setup(filepath)
-    ad.options.mode = "plot"
-    ad.options.auto_rotate = False
-    ad.options.reordering = 0
-    ad.options.check_limits = True
-    ad.options.clip_to_page = True
+    output_buffer = io.StringIO()
+    lifts_value = 0
+    previous_mode = getattr(ad.options, 'mode', None)
+    previous_layer = getattr(ad.options, 'layer', None)
+    previous_model = getattr(ad.options, 'model', None)
+    previous_report_time = getattr(ad.options, 'report_time', False)
+    previous_report_lifts = getattr(ad.options, 'report_lifts', False)
 
-    if layer > 0:
-        ad.options.mode = "layers"
-        ad.options.layer = layer
+    try:
+        with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
+            ad.options.model = model_number
+            ad.plot_setup(filepath)
+            ad.options.mode = "plot"
+            ad.options.auto_rotate = False
+            ad.options.reordering = 0
+            ad.options.check_limits = True
+            ad.options.clip_to_page = True
+            ad.options.report_time = True
+            ad.options.report_lifts = True
 
-    ad.plot_run()
+            if layer > 0:
+                ad.options.mode = "layers"
+                ad.options.layer = layer
 
-    ad.options.mode = "manual"
-    ad.options.manual_cmd = "disable_xy"
-    ad.plot_run()
+            ad.plot_run()
+            lifts_value = int(getattr(ad, 'pen_lifts', 0) or 0)
+
+            ad.options.mode = "manual"
+            ad.options.manual_cmd = "disable_xy"
+            ad.plot_run()
+    finally:
+        ad.options.report_time = previous_report_time
+        ad.options.report_lifts = previous_report_lifts
+        if previous_mode is not None:
+            ad.options.mode = previous_mode
+        if previous_layer is not None:
+            ad.options.layer = previous_layer
+        if previous_model is not None:
+            ad.options.model = previous_model
+
+    output = output_buffer.getvalue().strip()
+    if not output:
+        output = 'Plot completed with no output.'
+
+    if 'pen lift' not in output.lower():
+        output = f"{output}\nNumber of pen lifts: {lifts_value}" if output else f"Number of pen lifts: {lifts_value}"
+
+    return output
 
 
 def preview_plot(ad, filepath, layer=0, model_number=4):

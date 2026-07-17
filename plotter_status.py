@@ -21,6 +21,24 @@ class PlotterStatusService:
         """Return the configured fallback model number."""
         return int(os.environ.get("AXIDRAW_MODEL", "4"))
 
+    def get_plotter_name(self):
+        """Return the best known plotter display name from cached status data."""
+        if self.last_usb_id and self.last_usb_id in self.device_cache:
+            machine_name = self.device_cache[self.last_usb_id].get("machine", "Unknown")
+            if machine_name and machine_name.lower() != "none":
+                return machine_name
+
+        if self.last_usb_id:
+            machine_name, _ = self.identify_machine(self.last_usb_id)
+            if machine_name and machine_name.lower() != "none":
+                return machine_name
+
+        machine_name = self.last_known_status.get("machine", "Unknown")
+        if not machine_name or str(machine_name).lower() == "none":
+            return "Unknown"
+
+        return machine_name
+
     def identify_machine(self, device_identifier):
         """Infer machine label and model number from an AxiDraw device identifier."""
         if "/dev/" in device_identifier or "COM" in device_identifier:
@@ -76,7 +94,10 @@ class PlotterStatusService:
             device_identifier = axidraw_list[0]
             print(f"Debug - device_identifier: '{device_identifier}'")
             self.last_usb_id = device_identifier
-            _, machine_model = self.identify_machine(device_identifier)
+            machine_type, machine_model = self.identify_machine(device_identifier)
+            self.last_known_status["machine"] = machine_type
+            self.last_known_status["device_info"] = device_identifier
+            self.last_known_status["model_number"] = machine_model
             return machine_model
 
         return self.get_default_model_number()

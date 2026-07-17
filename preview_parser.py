@@ -33,3 +33,37 @@ def parse_preview_output(preview_output):
         'plot_path': float(path_match.group(1)),
         'plot_travel': float(travel_match.group(1)),
     }
+
+
+def parse_plot_output(plot_output):
+    """Extract elapsed timing and distance/lift metrics from plot console output."""
+    elapsed_match = re.search(r'Elapsed time:\s*([0-9:]+)', plot_output)
+    path_match = re.search(r'Length of path drawn:\s*([0-9]+(?:\.[0-9]+)?)\s*m', plot_output)
+    distance_match = re.search(r'Total distance moved:\s*([0-9]+(?:\.[0-9]+)?)\s*m', plot_output)
+
+    lift_patterns = [
+        r'(?im)^.*number\s+of\s+pen\s+lifts?\s*[:=]?\s*([0-9][0-9,]*)\b',
+        r'(?im)^.*pen\s*-?\s*lifts?\s*[:=]?\s*([0-9][0-9,]*)\b',
+        r'(?im)^.*pen\s*lift\s*count\s*[:=]?\s*([0-9][0-9,]*)\b',
+        r'(?im)^.*pen\s*-?\s*down\s*events?\s*[:=]?\s*([0-9][0-9,]*)\b',
+        r'(?im)^.*lifts?\s*[:=]?\s*([0-9][0-9,]*)\b',
+    ]
+    lifts_match = None
+    for pattern in lift_patterns:
+        lifts_match = re.search(pattern, plot_output, re.IGNORECASE)
+        if lifts_match:
+            break
+
+    if not elapsed_match:
+        raise ValueError('Could not parse elapsed plot duration')
+
+    lifts_value = 0
+    if lifts_match:
+        lifts_value = int(lifts_match.group(1).replace(',', ''))
+
+    return {
+        'plot_duration': parse_duration_to_seconds(elapsed_match.group(1)),
+        'plot_path': float(path_match.group(1)) if path_match else 0.0,
+        'plot_travel': float(distance_match.group(1)) if distance_match else 0.0,
+        'lifts': lifts_value,
+    }
