@@ -1,5 +1,7 @@
 Flask==3.0.1
 CairoSVG==2.7.1
 flask-cors==5.0.1
-pyaxidraw==3.9.6
 python-dotenv==1.0.0
+
+# AxiDraw API bundle; intended version 3.9.6
+axicli @ https://cdn.evilmadscientist.com/dl/ad/public/AxiDraw_API.zip

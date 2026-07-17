@@ -17,7 +17,6 @@ python -m venv .venv
 
 ```
 source .venv/bin/activate
-python -m pip install https://cdn.evilmadscientist.com/dl/ad/public/AxiDraw_API.zip
 pip install -r requirements.txt
 ```
 
