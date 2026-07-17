@@ -8,6 +8,7 @@
 
 from dotenv import load_dotenv
 from io import BytesIO
+import csv
 import json
 import threading
 from pyaxidraw import axidraw
@@ -51,6 +52,43 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
 art_dir = app.config['UPLOAD_FOLDER']
+
+TOOLS_CSV_PATH = os.path.join(BASE_DIR, 'tools.csv')
+MATERIAL_CSV_PATH = os.path.join(BASE_DIR, 'material.csv')
+
+
+def load_csv_options(file_path):
+    """Load one option per line from a CSV file (first column only)."""
+    options = []
+
+    if not os.path.exists(file_path):
+        print(f"[WARN] Options CSV not found: {file_path}")
+        return options
+
+    try:
+        with open(file_path, newline='', encoding='utf-8') as csv_file:
+            reader = csv.reader(csv_file)
+            for row in reader:
+                if not row:
+                    continue
+
+                value = row[0].strip()
+                if not value:
+                    continue
+
+                # Keep None as an HTML default option only.
+                if value.lower() == 'none':
+                    continue
+
+                options.append(value)
+    except OSError as error:
+        print(f"[WARN] Failed to read options CSV {file_path}: {error}")
+
+    return options
+
+
+TOOL_OPTIONS = load_csv_options(TOOLS_CSV_PATH)
+MATERIAL_OPTIONS = load_csv_options(MATERIAL_CSV_PATH)
 
 
 def get_active_model_number():
@@ -112,7 +150,14 @@ def index():
     plot_files.sort(key=lambda item: (-item[0], item[1]['filename'].lower()))
     plot_files = [entry for _, entry in plot_files]
 
-    return render_template('index.html', files=plot_files, art_dir=art_dir, app_version=APP_VERSION)
+    return render_template(
+        'index.html',
+        files=plot_files,
+        art_dir=art_dir,
+        app_version=APP_VERSION,
+        tool_options=TOOL_OPTIONS,
+        material_options=MATERIAL_OPTIONS,
+    )
 
 # Define route for a plot request
 @app.route('/plot/<path:file>', methods=['GET', 'POST'])

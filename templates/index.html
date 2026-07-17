@@ -182,42 +182,18 @@
 
                         <label for="tool">Tool</label>
                         <select id="tool" name="tool">
-                            <option value="None">None</option>
-                            <option value="Green Brush Pen">Green Brush Pen</option>
-                            <option value="Lamy Safari Blue">Lamy Safari Blue</option>
-                            <option value="Micron 01 black">Micron 01 black</option>
-                            <option value="Micron 01 Black">Micron 01 Black</option>
-                            <option value="Papermate Flair Fine">Papermate Flair Fine</option>
-                            <option value="Papermate Flair Medium" selected>Papermate Flair Medium</option>
-                            <option value="Pilot Precise v5 Extra Fine Black">Pilot Precise v5 Extra Fine Black</option>
-                            <option value="Rotrin Isograph 0.5 Black">Rotrin Isograph 0.5 Black</option>
-                            <option value="Rotring Isograph 0.1">Rotring Isograph 0.1</option>
-                            <option value="Rotring Isograph 0.2">Rotring Isograph 0.2</option>
-                            <option value="Rotring Isograph 0.3">Rotring Isograph 0.3</option>
-                            <option value="Rotring Isograph 0.4">Rotring Isograph 0.4</option>
-                            <option value="Rotring Isograph 0.5">Rotring Isograph 0.5</option>
-                            <option value="Rotring Isograph 0.5mm with Rotring Ink">Rotring Isograph 0.5mm with Rotring Ink</option>
-                            <option value="Sharpie Fine Point Black">Sharpie Fine Point Black</option>
-                            <option value="Sharpie Fine Point">Sharpie Fine Point</option>
-                            <option value="Stabilo Fine">Stabilo Fine</option>
-                            <option value="Stabilo Fineliner">Stabilo Fineliner</option>
-                            <option value="Stabilo point 88 fine 0,4 magenta">Stabilo point 88 fine 0,4 magenta</option>
-                            <option value="Stabilo point 88 fine 0,4 yellow">Stabilo point 88 fine 0,4 yellow</option>
-                            <option value="Stabilo Yellow">Stabilo Yellow</option>
-                            <option value="Staedtler pigment liner 1.2">Staedtler pigment liner 1.2</option>
-                            <option value="Tul Gel Pen Bold Black">Tul Gel Pen Bold Black</option>
+                            <option value="None" selected>None</option>
+                        {% for tool_option in tool_options %}
+                            <option value="{{ tool_option }}">{{ tool_option }}</option>
+                        {% endfor %}
                         </select>
 
                         <label for="material">Material</label>
                         <select id="material" name="material">
-                            <option value="A6 Invitation Envelope 100 GSM">A6 Invitation Envelope 100 GSM</option>
-                            <option value="Index Card">Index Card</option>
-                            <option value="Paper: Arches Watercolor Cold Pressed Cotton 140lb">Paper: Arches Watercolor Cold Pressed Cotton 140lb</option>
-                            <option value="Paper: Canson Mixed Media" selected>Paper: Canson Mixed Media</option>
-                            <option value="Paper: Printer Paper">Paper: Printer Paper</option>
-                            <option value="Paper: Strathmore Bristol smooth 100lb">Paper: Strathmore Bristol smooth 100lb</option>
-                            <option value="Paper: Strathmore Bristol 400 Series">Paper: Strathmore Bristol 400 Series</option>
-                            <option value="Paper: Copy Paper">Paper: Copy Paper</option>
+                            <option value="None" selected>None</option>
+                        {% for material_option in material_options %}
+                            <option value="{{ material_option }}">{{ material_option }}</option>
+                        {% endfor %}
                         </select>
 
                         <input type="hidden" name="filename" value="" />
