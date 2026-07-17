@@ -14,7 +14,7 @@ from pyaxidraw import axidraw
 from flask import Flask, request, Response, render_template, send_file
 from flask_cors import CORS
 import os
-from plotter_service import plot, preview_plot
+from plotter_service import plot, preview_plot, toggle_servo
 from plotter_status import PlotterStatusService
 from preview_parser import parse_preview_output
 from svg_library import (
@@ -34,7 +34,8 @@ sem = threading.Semaphore()
 
 # Create an AxiDraw class instance
 ad = axidraw.AxiDraw()
-status_service = PlotterStatusService(ad, sem)
+status_ad = axidraw.AxiDraw()
+status_service = PlotterStatusService(status_ad, sem)
 
 # Create new Flask app
 app = Flask(__name__)
@@ -50,6 +51,16 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 
 art_dir = app.config['UPLOAD_FOLDER']
+
+
+def get_active_model_number():
+    """Prefer detected hardware model; fall back to configured environment default."""
+    try:
+        return status_service.detect_connected_model_number()
+    except Exception as error:
+        fallback_model = status_service.get_default_model_number()
+        print(f"[WARN] Falling back to configured AxiDraw model {fallback_model}: {error}")
+        return fallback_model
 
 def resolve_artwork_path(relative_path):
     """Resolve a user-supplied artwork path within the configured art directory."""
@@ -125,13 +136,14 @@ def plot_request(file):
             try:
                 if request.args.get("preview", "").lower() == "true":
                     preview_layer = request.args.get("layer", default=0, type=int)
-                    preview_output = preview_plot(ad, filepath, preview_layer)
+                    model_number = get_active_model_number()
+                    preview_output = preview_plot(ad, filepath, preview_layer, model_number)
                     preview_data = parse_preview_output(preview_output)
                     return Response(json.dumps(preview_data), mimetype='application/json')
 
                 # Determine requested layer
                 layer = request.args.get("layer", default=0, type=int)
-                model_number = int(os.environ.get("AXIDRAW_MODEL", "4"))
+                model_number = get_active_model_number()
                 plot(ad, filepath, layer, model_number)
                 response = 'Done: ' + str(layer)
             except Exception as e:
@@ -250,6 +262,26 @@ def status_json():
     response.headers['Expires'] = '0'
 
     return response
+
+
+@app.route('/servo/toggle', methods=['POST'])
+def servo_toggle():
+    """Toggle the AxiDraw servo pen state (up/down)."""
+    if not sem.acquire(True, 1.0):
+        return Response(json.dumps({'error': 'Busy'}), status=503, mimetype='application/json')
+
+    try:
+        model_number = get_active_model_number()
+        servo_ad = axidraw.AxiDraw()
+        print(f"[INFO] Servo toggle request: model={model_number}")
+        toggle_servo(servo_ad, model_number)
+        print("[INFO] Servo toggle command completed")
+        return Response(json.dumps({'status': 'ok'}), mimetype='application/json')
+    except Exception as error:
+        print(f"[ERROR] Exception during servo toggle: {error}")
+        return Response(json.dumps({'error': str(error)}), status=500, mimetype='application/json')
+    finally:
+        sem.release()
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("HOST_PORT", 5007)))

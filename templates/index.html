@@ -189,6 +189,7 @@
 
                         <label for="tool">Tool</label>
                         <select id="tool" name="tool">
+                            <option value="None">None</option>
                             <option value="Green Brush Pen">Green Brush Pen</option>
                             <option value="Lamy Safari Blue">Lamy Safari Blue</option>
                             <option value="Micron 01 black">Micron 01 black</option>
@@ -222,8 +223,8 @@
                             <option value="Paper: Canson Mixed Media" selected>Paper: Canson Mixed Media</option>
                             <option value="Paper: Printer Paper">Paper: Printer Paper</option>
                             <option value="Paper: Strathmore Bristol smooth 100lb">Paper: Strathmore Bristol smooth 100lb</option>
-                            <option value="Printer Paper">Printer Paper</option>
-                            <option value="Strathmore Bristol smooth 100lb">Strathmore Bristol smooth 100lb</option>
+                            <option value="Paper: Strathmore Bristol 400 Series">Paper: Strathmore Bristol 400 Series</option>
+                            <option value="Paper: Copy Paper">Paper: Copy Paper</option>
                         </select>
 
                         <input type="hidden" name="filename" value="" />
@@ -243,6 +244,13 @@
                             <span id="copy-plot-command-status" aria-live="polite"></span>
                         </div>
                     </details>
+
+                    <div class="plotter-controls-section">
+                        <p class="eyebrow">Plotter Control</p>
+                        <button id="toggle-servo-button" type="button" title="Toggle Servo">Toggle Servo</button>
+                        <span id="toggle-servo-status" aria-live="polite"></span>
+                    </div>
+
                 </section>
 
                 <section class="card download-card">
@@ -1014,6 +1022,7 @@
         }
 
         let copyPlotCommandTimeout = null;
+        let toggleServoStatusTimeout = null;
 
         function showCopyPlotCommandStatus(message, isError = false) {
             const statusElement = document.querySelector('#copy-plot-command-status');
@@ -1028,6 +1037,68 @@
                 statusElement.textContent = '';
                 statusElement.className = '';
             }, 2000);
+        }
+
+        function showToggleServoStatus(message, isError = false) {
+            const statusElement = document.querySelector('#toggle-servo-status');
+            if (!statusElement) {
+                return;
+            }
+
+            statusElement.textContent = message;
+            statusElement.className = isError ? 'copy-status copy-status-error' : 'copy-status';
+
+            if (toggleServoStatusTimeout) {
+                clearTimeout(toggleServoStatusTimeout);
+            }
+
+            toggleServoStatusTimeout = setTimeout(() => {
+                statusElement.textContent = '';
+                statusElement.className = '';
+            }, 2500);
+        }
+
+        async function toggleServo() {
+            const toggleButton = document.querySelector('#toggle-servo-button');
+            if (!toggleButton || toggleButton.disabled) {
+                return;
+            }
+
+            toggleButton.disabled = true;
+            showToggleServoStatus('Toggling...');
+
+            try {
+                const response = await fetch('/servo/toggle', { method: 'POST' });
+                if (response.status === 503) {
+                    showToggleServoStatus('Plotter busy', true);
+                    return;
+                }
+
+                if (!response.ok) {
+                    let errorMessage = `Servo toggle request failed (${response.status})`;
+                    try {
+                        const errorPayload = await response.json();
+                        if (errorPayload && errorPayload.error) {
+                            errorMessage = errorPayload.error;
+                        }
+                    } catch (parseError) {
+                        // Keep fallback message when response is not JSON.
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                showToggleServoStatus('Servo toggled');
+
+                const statusResponse = await fetch('/status.json', { cache: 'no-store' });
+                if (statusResponse.ok) {
+                    updatePlotterStatus(await statusResponse.json());
+                }
+            } catch (error) {
+                console.error('Failed to toggle servo:', error);
+                showToggleServoStatus(error.message || 'Toggle failed', true);
+            } finally {
+                toggleButton.disabled = false;
+            }
         }
 
         // Check plotter status with detailed information
@@ -1080,7 +1151,7 @@
                 color = '#ff6600'; // orange
                 statusText = 'Connected (Check Power)';
             } else if (data.status === 'on') {
-                statusText = 'On';
+                statusText = 'Ready';
                 color = '#2ecc40'; // green
                 // Stop polling if plotter is ready
                 if (busyPollingInterval) {
@@ -1464,6 +1535,10 @@
 
         document.querySelector('#delete-file-button').addEventListener('click', function() {
             deleteSelectedFile();
+        });
+
+        document.querySelector('#toggle-servo-button').addEventListener('click', function() {
+            toggleServo();
         });
 
         // Add event handler to Plot button

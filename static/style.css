@@ -824,6 +824,16 @@ html[data-theme="dark"] #svg-object svg rect {
   border: 1px solid var(--details-border);
 }
 
+.plotter-controls-section {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.plotter-controls-section .eyebrow {
+  margin-bottom: 0;
+}
+
 .plot-setup-card summary {
   cursor: pointer;
   font-weight: 700;
