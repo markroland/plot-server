@@ -1327,39 +1327,43 @@ function extractSvgDimensions(svgDocument) {
         return null;
     }
 
-    let width, height;
+    const lengthToMm = (value) => {
+        const match = value?.trim().match(/^([0-9]*\.?[0-9]+)\s*(px|in|cm|mm|pt|pc)?$/i);
+        if (!match) {
+            return null;
+        }
 
-    // Try to get dimensions from viewBox first
+        const numericValue = Number(match[1]);
+        const unit = (match[2] || 'px').toLowerCase();
+        const millimetersPerUnit = {
+            px: 25.4 / 96,
+            in: 25.4,
+            cm: 10,
+            mm: 1,
+            pt: 25.4 / 72,
+            pc: 25.4 / 6,
+        }[unit];
+
+        return millimetersPerUnit ? numericValue * millimetersPerUnit : null;
+    };
+
+    const widthFromAttribute = lengthToMm(svgElement.getAttribute('width'));
+    const heightFromAttribute = lengthToMm(svgElement.getAttribute('height'));
+    if (widthFromAttribute && heightFromAttribute) {
+        return { width: widthFromAttribute, height: heightFromAttribute };
+    }
+
     const viewBox = svgElement.getAttribute('viewBox');
     if (viewBox) {
-        const [x, y, w, h] = viewBox.split(' ').map(parseFloat);
-        // ViewBox dimensions are in SVG user units (pixels at 96 DPI)
-        width = w * (25.4 / 96); // Convert to mm
-        height = h * (25.4 / 96);
-    } else {
-        // Fall back to width/height attributes
-        const widthAttr = svgElement.getAttribute('width');
-        const heightAttr = svgElement.getAttribute('height');
-
-        if (widthAttr && heightAttr) {
-            // Remove units and convert to numbers
-            width = parseFloat(widthAttr.replace(/[^\d.]/g, ''));
-            height = parseFloat(heightAttr.replace(/[^\d.]/g, ''));
-
-            // Convert from other units to mm if needed
-            // SVG uses 96 DPI standard (1 inch = 96 pixels, 1 inch = 25.4 mm)
-            if (widthAttr.includes('px') || !isNaN(parseFloat(widthAttr))) {
-                width = width * (25.4 / 96); // Convert px to mm at 96 DPI
-                height = height * (25.4 / 96);
-            } else if (widthAttr.includes('in')) {
-                width = width * 25.4; // Convert inches to mm
-                height = height * 25.4;
-            }
-            // Assume mm if no conversion needed
+        const values = viewBox.trim().split(/[\s,]+/).map(Number);
+        const width = values[2] * (25.4 / 96);
+        const height = values[3] * (25.4 / 96);
+        if (values.length === 4 && width > 0 && height > 0) {
+            return { width, height };
         }
     }
 
-    return width && height ? { width, height } : null;
+    return null;
 }
 
 // Function to check if SVG fits within plotter bounds
