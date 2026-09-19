@@ -14,8 +14,9 @@ def plot(ad, filepath, layer=0, model_number=4):
 
     try:
         with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
-            ad.options.model = model_number
             ad.plot_setup(filepath)
+            # plot_setup() resets options to defaults (model 1), so set the model afterward
+            ad.options.model = model_number
             ad.options.mode = "plot"
             ad.options.auto_rotate = False
             ad.options.reordering = 0
@@ -65,8 +66,9 @@ def preview_plot(ad, filepath, layer=0, model_number=4):
 
     try:
         with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
-            ad.options.model = model_number
             ad.plot_setup(filepath)
+            # plot_setup() resets options to defaults (model 1), so set the model afterward
+            ad.options.model = model_number
             if layer > 0:
                 ad.options.mode = "layers"
                 ad.options.layer = layer
@@ -97,8 +99,8 @@ def toggle_servo(ad, model_number=4):
     previous_model = getattr(ad.options, 'model', None)
 
     try:
-        ad.options.model = model_number
         ad.plot_setup()
+        ad.options.model = model_number
         ad.options.preview = False
         ad.options.mode = "toggle"
         ad.plot_run()

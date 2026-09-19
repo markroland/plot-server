@@ -168,8 +168,8 @@ def run_stop_cleanup_commands(model_number):
         "servo_state": "unknown",
     }
 
-    stop_ad.options.model = model_number
     stop_ad.plot_setup()
+    stop_ad.options.model = model_number
     stop_ad.options.preview = False
     stop_ad.options.mode = "manual"
 
