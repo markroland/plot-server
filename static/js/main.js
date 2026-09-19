@@ -601,6 +601,75 @@ function formatLogCellValue(value) {
     return String(value);
 }
 
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatLogTime(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(String(value || ''));
+    if (!match) {
+        return formatLogCellValue(value);
+    }
+
+    const [, year, month, day, hours24, minutes] = match;
+    const hours = Number(hours24) % 12 || 12;
+    const meridiem = Number(hours24) < 12 ? 'am' : 'pm';
+    return `${Number(month)}/${Number(day)}/${year.slice(2)} ${hours}:${minutes} ${meridiem}`;
+}
+
+function formatLogDecimal(value, digits = 1) {
+    const number = Number(value);
+    if (value === null || value === undefined || value === '' || !Number.isFinite(number)) {
+        return formatLogCellValue(value);
+    }
+
+    return number.toFixed(digits);
+}
+
+function formatLogCount(value) {
+    const number = Number(value);
+    if (value === null || value === undefined || value === '' || !Number.isFinite(number)) {
+        return formatLogCellValue(value);
+    }
+
+    return number.toLocaleString('en-US');
+}
+
+function formatLogFilename(filename, layer) {
+    if (!filename) {
+        return '-';
+    }
+
+    let href = `?plot=${encodeURIComponent(filename)}`;
+    if (layer && layer !== 'all' && layer !== '-') {
+        href += `&layer=${encodeURIComponent(layer)}`;
+    }
+
+    const label = filename.length > 32
+        ? `${filename.slice(0, 20)}…${filename.slice(-8)}`
+        : filename;
+
+    return `<a href="${href}" title="${escapeHtml(filename)}">${escapeHtml(label)}</a>`;
+}
+
+function formatLogHash(hash) {
+    if (!hash || hash === '-') {
+        return formatLogCellValue(hash);
+    }
+
+    const value = String(hash);
+    if (value.length <= 8) {
+        return escapeHtml(value);
+    }
+
+    return `<span title="${escapeHtml(value)}">${escapeHtml(value.slice(0, 8))}</span>`;
+}
+
 function updatePlotLogUi() {
     const emptyElement = document.querySelector('#plot-log-empty');
     const tableElement = document.querySelector('#plot-log-table');
@@ -624,11 +693,11 @@ function updatePlotLogUi() {
         const statusClass = getStatusClass(entry.status);
         return `
             <tr>
-                <td>${formatLogCellValue(entry.time)}</td>
+                <td>${formatLogTime(entry.time)}</td>
                 <td class="${statusClass}">${formatLogCellValue(entry.status)}</td>
                 <td>${formatLogCellValue(entry.title)}</td>
-                <td>${formatLogCellValue(entry.filename)}</td>
-                <td>${formatLogCellValue(entry.fileHash)}</td>
+                <td>${formatLogFilename(entry.filename, entry.layer)}</td>
+                <td>${formatLogHash(entry.fileHash)}</td>
                 <td>${formatLogCellValue(entry.plotter)}</td>
                 <td>${formatLogCellValue(entry.edition)}</td>
                 <td>${formatLogCellValue(entry.layer)}</td>
@@ -637,9 +706,9 @@ function updatePlotLogUi() {
                 <td>${formatLogCellValue(entry.format)}</td>
                 <td>${formatLogCellValue(entry.orientation)}</td>
                 <td>${formatLogCellValue(entry.duration)}</td>
-                <td>${formatLogCellValue(entry.path)}</td>
-                <td>${formatLogCellValue(entry.travel)}</td>
-                <td>${formatLogCellValue(entry.lifts)}</td>
+                <td>${formatLogDecimal(entry.path)}</td>
+                <td>${formatLogDecimal(entry.travel)}</td>
+                <td>${formatLogCount(entry.lifts)}</td>
             </tr>
         `;
     }).join('');
@@ -678,8 +747,8 @@ function normalizePersistedLogEntry(entry) {
     return {
         ...entry,
         duration: Number.isFinite(durationValue) ? formatDurationClock(durationValue) : (entry?.duration || '-'),
-        path: Number.isFinite(pathValue) ? pathValue.toFixed(2) : (entry?.path || '-'),
-        travel: Number.isFinite(travelValue) ? travelValue.toFixed(2) : (entry?.travel || '-'),
+        path: Number.isFinite(pathValue) ? pathValue : (entry?.path || '-'),
+        travel: Number.isFinite(travelValue) ? travelValue : (entry?.travel || '-'),
     };
 }
 
@@ -1888,8 +1957,8 @@ function send_plot_request(filename, layer = null){
                     format: payload?.format || context.format,
                     orientation: payload?.orientation || context.orientation,
                     duration: formatDurationClock(metrics.plot_duration),
-                    path: Number.isFinite(Number(metrics.plot_path)) ? Number(metrics.plot_path).toFixed(2) : '-',
-                    travel: Number.isFinite(Number(metrics.plot_travel)) ? Number(metrics.plot_travel).toFixed(2) : '-',
+                    path: Number.isFinite(Number(metrics.plot_path)) ? Number(metrics.plot_path) : '-',
+                    travel: Number.isFinite(Number(metrics.plot_travel)) ? Number(metrics.plot_travel) : '-',
                     lifts: Number.isFinite(Number(metrics.lifts)) ? String(metrics.lifts) : '-',
                 });
                 return payload;
