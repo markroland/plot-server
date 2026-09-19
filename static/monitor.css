@@ -1,0 +1,186 @@
+/* Read-only phone status page. Colors and the dark theme come from style.css. */
+
+.monitor [hidden] {
+  display: none !important;
+}
+
+.monitor-shell {
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+  padding-block: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-bottom));
+  padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+}
+
+.monitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding-inline: 0.25rem;
+}
+
+.monitor-machine {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.monitor-connection {
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
+
+.monitor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--card-border);
+  border-radius: 1.25rem;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.monitor-status {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.5rem;
+}
+
+.monitor-dot {
+  flex: none;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.monitor-shell[data-state="ready"] .monitor-dot { background: var(--success); }
+.monitor-shell[data-state="plotting"] .monitor-dot { background: var(--action); }
+.monitor-shell[data-state="warning"] .monitor-dot { background: var(--warning); }
+.monitor-shell[data-state="off"] .monitor-dot { background: var(--danger); }
+
+.monitor-shell[data-state="plotting"] .monitor-dot {
+  animation: monitor-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes monitor-pulse {
+  50% { opacity: 0.35; }
+}
+
+.monitor-note {
+  margin: -0.4rem 0 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Paper-colored frame keeps black linework legible in dark mode. */
+.monitor-thumb {
+  display: flex;
+  justify-content: center;
+  padding: 0.75rem;
+  border-radius: 0.9rem;
+  background: #fffdf8;
+  border: 1px solid var(--frame-border);
+}
+
+.monitor-thumb img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 45vh;
+}
+
+.monitor-job h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.monitor-job p {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.monitor-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  text-align: center;
+}
+
+.monitor-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.monitor-countdown__value {
+  font-size: clamp(3rem, 17vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--action);
+}
+
+.monitor-countdown__finish {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.monitor-playbar__track {
+  height: 0.85rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--control-progress-bg);
+}
+
+.monitor-playbar__fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--action);
+  transition: width 1s linear;
+}
+
+.monitor-playbar__times {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.monitor-playbar__times strong {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .monitor-shell[data-state="plotting"] .monitor-dot {
+    animation: none;
+  }
+
+  .monitor-playbar__fill {
+    transition: none;
+  }
+}

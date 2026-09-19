@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Plot Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link rel="stylesheet" type="text/css" href="/static/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/monitor.css">
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/images/favicon-16x16.png">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <script src="/static/js/monitor.js"></script>
+</head>
+<body class="monitor">
+    <main class="monitor-shell" id="monitor" data-state="loading">
+        <header class="monitor-header">
+            <span class="monitor-machine" id="monitor-machine">Plotter</span>
+            <span class="monitor-connection" id="monitor-connection" role="status" hidden>Connection lost</span>
+        </header>
+
+        <section class="monitor-card">
+            <div class="monitor-status">
+                <span class="monitor-dot" aria-hidden="true"></span>
+                <strong id="monitor-status-text">Checking...</strong>
+            </div>
+            <p class="monitor-note" id="monitor-note" hidden></p>
+
+            <div class="monitor-thumb" id="monitor-thumb" hidden>
+                <img id="monitor-thumb-img" alt="Thumbnail of the plot in progress">
+            </div>
+
+            <div class="monitor-job" id="monitor-job" hidden>
+                <h1 id="monitor-title"></h1>
+                <p id="monitor-subtitle"></p>
+            </div>
+
+            <div class="monitor-countdown" id="monitor-countdown" hidden>
+                <span class="monitor-label">Time remaining</span>
+                <span class="monitor-countdown__value" id="monitor-remaining">--:--</span>
+                <span class="monitor-countdown__finish" id="monitor-finish"></span>
+            </div>
+
+            <div class="monitor-playbar" id="monitor-playbar" role="progressbar" aria-label="Plot progress" aria-valuemin="0" aria-valuemax="100" hidden>
+                <div class="monitor-playbar__track">
+                    <div class="monitor-playbar__fill" id="monitor-fill"></div>
+                </div>
+                <div class="monitor-playbar__times">
+                    <span>Elapsed <strong id="monitor-elapsed">00:00</strong></span>
+                    <span id="monitor-percent"></span>
+                    <span id="monitor-left"></span>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

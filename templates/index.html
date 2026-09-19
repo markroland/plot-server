@@ -303,6 +303,10 @@
 
         <footer class="app-footer">
             <a href="#info" id="info-link" class="footer-info-link" aria-haspopup="dialog" aria-controls="info-modal">Project Info</a>
+            {% if network_address %}
+            <span aria-hidden="true">•</span>
+            <span id="network-address" title="Phone monitor: http://{{ network_address }}/monitor">{{ network_address }}</span>
+            {% endif %}
         </footer>
 
         <div id="info-modal" class="modal-overlay" hidden>

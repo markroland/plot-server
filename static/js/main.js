@@ -23,6 +23,10 @@ let plotCountdownInterval = null;
 let plotCountdownEndTimeMs = null;
 let preserveCountdownAfterStop = false;
 let previewLoadRequestId = 0;
+// The plot the server reports as running (from /status.json), and the one whose countdown this tab adopted.
+let activeServerPlot = null;
+let adoptedPlotStartedAt = null;
+let currentPreviewLayerValue = '';
 let plotLogEntries = [];
 let activePlotLogEntryId = null;
 const INKSCAPE_NAMESPACE = 'http://www.inkscape.org/namespaces/inkscape';
@@ -79,6 +83,7 @@ function setBusyStatusLocally() {
     const fallbackData = {
         status: 'busy',
         plot_state: 'plotting',
+        current_plot: null,
         machine: currentPlotterData?.machine || 'Unknown',
         config: currentPlotterData?.config || {},
     };
@@ -830,20 +835,77 @@ function resetPreviewEstimate(message = 'Loading') {
     const durationElement = document.querySelector('#preview-duration');
     durationElement.textContent = message;
     durationElement.className = 'preview-metric__value';
-    stopPlotCountdown(true);
+
+    // The countdown belongs to the running plot, not to whichever file is selected.
+    if (!activeServerPlot && !plotRequestInFlight) {
+        stopPlotCountdown(true);
+    }
+
     setText('#preview-path', message);
     setText('#preview-travel', message);
 }
 
-function renderPreviewEstimate(data) {
+function renderPreviewMetrics(data) {
     currentPreviewEstimate = data;
-    const estimatedDurationSeconds = Number(data.plot_duration);
     const durationElement = document.querySelector('#preview-duration');
-    durationElement.textContent = formatDurationFromSeconds(estimatedDurationSeconds);
+    durationElement.textContent = formatDurationFromSeconds(Number(data.plot_duration));
     durationElement.className = 'preview-metric__value';
-    setCountdownValue(formatCountdown(estimatedDurationSeconds), false);
     setText('#preview-path', formatMeters(Number(data.plot_path)));
     setText('#preview-travel', formatMeters(Number(data.plot_travel)));
+}
+
+function renderPreviewEstimate(data) {
+    renderPreviewMetrics(data);
+    setCountdownValue(formatCountdown(Number(data.plot_duration)), false);
+}
+
+// Show the running plot's stats when it is the plot currently selected. The preview
+// endpoint is unavailable while plotting, so this is the only source for them.
+function renderActivePlotEstimate(filename, layerValue) {
+    const job = activeServerPlot;
+    if (!job?.estimate || job.file !== filename || Number(job.layer || 0) !== Number(layerValue || 0)) {
+        return false;
+    }
+
+    renderPreviewMetrics(job.estimate);
+    return true;
+}
+
+function getServerPlotRemainingSeconds(job, serverTime) {
+    const estimatedDuration = Number(job?.estimate?.plot_duration);
+    if (!Number.isFinite(estimatedDuration) || estimatedDuration <= 0) {
+        return null;
+    }
+
+    // Elapsed time is measured on the server's clock so browser clock skew doesn't matter.
+    const elapsedSeconds = Number.isFinite(Number(serverTime)) ? Number(serverTime) - job.started_at : 0;
+    return Math.max(0, estimatedDuration - elapsedSeconds);
+}
+
+// Resume the countdown and stats for a plot this tab didn't start (e.g. after a page refresh).
+function syncActivePlotFromStatus(data) {
+    const job = data.current_plot || null;
+    activeServerPlot = job;
+
+    // A tab that started the plot already runs its own countdown.
+    if (plotRequestInFlight) {
+        return;
+    }
+
+    if (job) {
+        if (adoptedPlotStartedAt !== job.started_at) {
+            adoptedPlotStartedAt = job.started_at;
+            startPlotCountdown(getServerPlotRemainingSeconds(job, data.server_time));
+        }
+
+        const selectedFilename = document.querySelector('#svg-object')?.getAttribute('data-filename');
+        renderActivePlotEstimate(selectedFilename, currentPreviewLayerValue);
+    } else if (adoptedPlotStartedAt !== null) {
+        adoptedPlotStartedAt = null;
+        const shouldPreserveCountdown = preserveCountdownAfterStop;
+        preserveCountdownAfterStop = false;
+        stopPlotCountdown(!shouldPreserveCountdown);
+    }
 }
 
 async function loadPreviewEstimate(filename, loadRequestId, selectedLayerValue = '') {
@@ -871,6 +933,10 @@ async function loadPreviewEstimate(filename, loadRequestId, selectedLayerValue =
     } catch (error) {
         console.error('Failed to load preview estimate:', error);
         if (loadRequestId !== previewLoadRequestId) {
+            return;
+        }
+
+        if (renderActivePlotEstimate(filename, selectedLayerValue)) {
             return;
         }
 
@@ -1266,6 +1332,7 @@ xhr.send();
 function updatePlotterStatus(data) {
     // Store plotter data globally
     currentPlotterData = data;
+    syncActivePlotFromStatus(data);
 
     // Show status with color coding
     let statusText = data.status;
@@ -1460,6 +1527,7 @@ async function loadAnimatedPreview(filepath, filename, selectedLayerValue = '') 
     const previewElement = document.querySelector('#svg-object');
     const loadRequestId = ++previewLoadRequestId;
     previewElement.setAttribute('data-filename', filename);
+    currentPreviewLayerValue = selectedLayerValue;
     resetPreviewEstimate();
     if (currentAnimator) {
         currentAnimator.pause();

@@ -8,9 +8,11 @@
 
 from dotenv import load_dotenv
 from io import BytesIO
+from urllib.parse import quote
 import csv
 import hashlib
 import json
+import socket
 import threading
 import time
 from pyaxidraw import axidraw
@@ -29,6 +31,8 @@ from svg_library import (
 
 # Load settings from environment
 load_dotenv()
+
+HOST_PORT = int(os.environ.get("HOST_PORT", 5007))
 
 
 # Set up a Semaphore object for use with blocking plot
@@ -66,10 +70,12 @@ app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 art_dir = app.config['UPLOAD_FOLDER']
 LOG_DIR = os.path.join(BASE_DIR, 'log')
 PLOT_LOG_FILE = os.path.join(LOG_DIR, 'plot-log.jsonl')
+CURRENT_PLOT_FILE = os.path.join(LOG_DIR, 'current-plot.json')
 
 TOOLS_CSV_PATH = os.path.join(BASE_DIR, 'tools.csv')
 MATERIAL_CSV_PATH = os.path.join(BASE_DIR, 'material.csv')
 plot_log_file_lock = threading.Lock()
+current_plot_file_lock = threading.Lock()
 
 
 def load_csv_options(file_path):
@@ -139,6 +145,16 @@ def apply_runtime_state_to_status(status_data):
 
     status_data["stop_requested"] = runtime_state["stop_requested"]
     status_data["last_stop"] = runtime_state["last_stop"]
+
+    # Lets a freshly loaded page resume the countdown. server_time is included so
+    # the client can compute time remaining without trusting its own clock.
+    current_plot = load_current_plot() if runtime_state["is_plotting"] else None
+    if current_plot and current_plot.get("file"):
+        thumbnail_path = quote(build_thumbnail_relative_path(current_plot["file"]))
+        current_plot["thumbnail_url"] = f"/static/uploads/{thumbnail_path}"
+
+    status_data["current_plot"] = current_plot
+    status_data["server_time"] = time.time()
     return status_data
 
 
@@ -205,6 +221,28 @@ def remove_empty_parent_directories(path, stop_dir):
         current_dir = os.path.dirname(current_dir)
 
 
+def get_local_network_address():
+    """Return this machine's LAN address with the server port (e.g. 192.168.1.60:5007), or None."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        # Connecting a UDP socket sends nothing; it only makes the OS pick the outbound interface.
+        probe.connect(('10.255.255.255', 1))
+        ip_address = probe.getsockname()[0]
+    except OSError:
+        try:
+            ip_address = socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return None
+    finally:
+        probe.close()
+
+    if ip_address.startswith('127.') or ip_address == '0.0.0.0':
+        return None
+
+    return f"{ip_address}:{HOST_PORT}"
+
+
 def get_file_added_timestamp(path):
     """Return the file creation time when available, otherwise the modification time."""
     file_stats = os.stat(path)
@@ -262,6 +300,55 @@ def clear_plot_log_entries():
         with open(PLOT_LOG_FILE, 'w', encoding='utf-8') as log_file:
             log_file.write('')
 
+
+def write_current_plot(job):
+    """Persist the in-progress plot (start time, estimate, context) so a reloaded page can resume its countdown."""
+    temp_path = f"{CURRENT_PLOT_FILE}.tmp"
+
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+
+        with current_plot_file_lock:
+            with open(temp_path, 'w', encoding='utf-8') as plot_file:
+                json.dump(job, plot_file, ensure_ascii=True)
+            os.replace(temp_path, CURRENT_PLOT_FILE)
+    except OSError as error:
+        print(f"[WARN] Failed to write current plot file: {error}")
+
+
+def load_current_plot():
+    """Return the in-progress plot record, or None when there is no readable one."""
+    with current_plot_file_lock:
+        try:
+            with open(CURRENT_PLOT_FILE, 'r', encoding='utf-8') as plot_file:
+                return json.load(plot_file)
+        except (OSError, json.JSONDecodeError):
+            return None
+
+
+def clear_current_plot():
+    """Remove the in-progress plot record."""
+    with current_plot_file_lock:
+        try:
+            os.remove(CURRENT_PLOT_FILE)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            print(f"[WARN] Failed to remove current plot file: {error}")
+
+
+def estimate_plot(filepath, layer, model_number):
+    """Run a preview pass for the plot about to start; None if no estimate could be produced."""
+    try:
+        return parse_preview_output(preview_plot(ad, filepath, layer, model_number))
+    except Exception as error:
+        print(f"[WARN] Could not estimate plot before starting: {error}")
+        return None
+
+
+# A record left behind by a crash or restart mid-plot describes a plot that is no longer running.
+clear_current_plot()
+
 # Define route: Default
 @app.route('/')
 def index():
@@ -285,9 +372,16 @@ def index():
         files=plot_files,
         art_dir=art_dir,
         app_version=APP_VERSION,
+        network_address=get_local_network_address(),
         tool_options=TOOL_OPTIONS,
         material_options=MATERIAL_OPTIONS,
     )
+
+
+@app.route('/monitor')
+def monitor():
+    """Render the read-only, phone-friendly plotter status page."""
+    return render_template('monitor.html')
 
 # Define route for a plot request
 @app.route('/plot/<path:file>', methods=['GET', 'POST'])
@@ -326,8 +420,25 @@ def plot_request(file):
                 edition = request.args.get('edition', default=1, type=int)
                 editions = request.args.get('editions', default=1, type=int)
                 model_number = get_active_model_number()
-                set_runtime_plot_state(is_plotting=True, stop_requested=False)
+                estimate = estimate_plot(filepath, layer, model_number)
                 started_at = int(time.time())
+                write_current_plot({
+                    'file': file,
+                    'filename': os.path.basename(filepath),
+                    'title': title,
+                    'layer': layer,
+                    'tool': tool,
+                    'media': media,
+                    'format': format_value,
+                    'orientation': orientation,
+                    'edition': edition,
+                    'editions': editions,
+                    'plotter': status_service.get_plotter_name(),
+                    'model_number': model_number,
+                    'started_at': started_at,
+                    'estimate': estimate,
+                })
+                set_runtime_plot_state(is_plotting=True, stop_requested=False)
                 plot_output = plot(ad, filepath, layer, model_number)
                 completed_at = int(time.time())
 
@@ -386,6 +497,7 @@ def plot_request(file):
                 print(f"[ERROR] Exception during plot: {e}")
                 response = f'Error: {e}', 500
             finally:
+                clear_current_plot()
                 set_runtime_plot_state(is_plotting=False)
                 sem.release()
         else:
@@ -592,4 +704,4 @@ def servo_toggle():
         sem.release()
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get("HOST_PORT", 5007)))
+    app.run(debug=True, host='0.0.0.0', port=HOST_PORT)

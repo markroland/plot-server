@@ -63,3 +63,11 @@ nohup python index.py > /dev/null 2>&1 &
 
 Open the URL initiated by Flask in your web browser. It should be your local IP
 address followed by the port, so something like `http://192.168.0.10:5007`.
+
+### Monitor Progress (on local network)
+
+Open `/monitor` (for example `http://192.168.0.10:5007/monitor`) for a read-only
+status page. While a plot is running it shows the plot's thumbnail, a countdown to
+the estimated finish time, and a progress bar with time elapsed and remaining.
+It has no controls, so it is safe to leave open.
+The server's network address and port are shown in the footer of the main page.
