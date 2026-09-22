@@ -16,6 +16,7 @@ import socket
 import threading
 import time
 from pyaxidraw import axidraw
+from axicli import utils as axicli_utils
 from flask import Flask, request, Response, render_template, send_file
 from flask_cors import CORS
 import os
@@ -50,7 +51,6 @@ runtime_plot_state = {
 }
 
 # Create an AxiDraw class instance
-ad = axidraw.AxiDraw()
 status_ad = axidraw.AxiDraw()
 status_service = PlotterStatusService(status_ad, sem)
 
@@ -160,7 +160,7 @@ def apply_runtime_state_to_status(status_data):
 
 def run_stop_cleanup_commands(model_number):
     """Best-effort stop cleanup: command pen up first, then disable XY motors."""
-    stop_ad = axidraw.AxiDraw()
+    stop_ad = build_axidraw_for_model(model_number)
 
     result = {
         "raise_pen": False,
@@ -193,6 +193,19 @@ def get_active_model_number():
         fallback_model = status_service.get_default_model_number()
         print(f"[WARN] Falling back to configured AxiDraw model {fallback_model}: {error}")
         return fallback_model
+
+
+def build_axidraw_for_model(model_number):
+    """Construct an AxiDraw instance using the device's config file (AXIDRAW_MODEL_<n>_CONFIG),
+    merged over AxiDraw's built-in defaults -- the same mechanism axicli uses for `--config`.
+    Falls back to plain defaults if no config file is set for this model."""
+    config_path = os.environ.get(f"AXIDRAW_MODEL_{model_number}_CONFIG")
+
+    if not config_path or not os.path.exists(config_path):
+        return axidraw.AxiDraw()
+
+    config_dict = axicli_utils.load_configs([config_path, 'axidrawinternal.axidraw_conf'])
+    return axidraw.AxiDraw(params=axicli_utils.FakeConfigModule(config_dict))
 
 def resolve_artwork_path(relative_path):
     """Resolve a user-supplied artwork path within the configured art directory."""
@@ -337,7 +350,7 @@ def clear_current_plot():
             print(f"[WARN] Failed to remove current plot file: {error}")
 
 
-def estimate_plot(filepath, layer, model_number):
+def estimate_plot(ad, filepath, layer, model_number):
     """Run a preview pass for the plot about to start; None if no estimate could be produced."""
     try:
         return parse_preview_output(preview_plot(ad, filepath, layer, model_number))
@@ -406,6 +419,7 @@ def plot_request(file):
                 if request.args.get("preview", "").lower() == "true":
                     preview_layer = request.args.get("layer", default=0, type=int)
                     model_number = get_active_model_number()
+                    ad = build_axidraw_for_model(model_number)
                     preview_output = preview_plot(ad, filepath, preview_layer, model_number)
                     preview_data = parse_preview_output(preview_output)
                     return Response(json.dumps(preview_data), mimetype='application/json')
@@ -420,7 +434,8 @@ def plot_request(file):
                 edition = request.args.get('edition', default=1, type=int)
                 editions = request.args.get('editions', default=1, type=int)
                 model_number = get_active_model_number()
-                estimate = estimate_plot(filepath, layer, model_number)
+                ad = build_axidraw_for_model(model_number)
+                estimate = estimate_plot(ad, filepath, layer, model_number)
                 started_at = int(time.time())
                 write_current_plot({
                     'file': file,
@@ -708,7 +723,7 @@ def servo_toggle():
 
     try:
         model_number = get_active_model_number()
-        servo_ad = axidraw.AxiDraw()
+        servo_ad = build_axidraw_for_model(model_number)
         print(f"[INFO] Servo toggle request: model={model_number}")
         toggle_servo(servo_ad, model_number)
         print("[INFO] Servo toggle command completed")

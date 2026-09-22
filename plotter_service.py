@@ -19,7 +19,7 @@ def plot(ad, filepath, layer=0, model_number=4):
             ad.options.model = model_number
             ad.options.mode = "plot"
             ad.options.auto_rotate = False
-            ad.options.reordering = 0
+            ad.options.reordering = 4
             ad.options.check_limits = True
             ad.options.clip_to_page = True
             ad.options.report_time = True
