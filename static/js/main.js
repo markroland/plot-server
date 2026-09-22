@@ -29,6 +29,8 @@ let adoptedPlotStartedAt = null;
 let currentPreviewLayerValue = '';
 let plotLogEntries = [];
 let activePlotLogEntryId = null;
+let currentMachineSettings = null;
+let lastFetchedMachineModel = undefined;
 const INKSCAPE_NAMESPACE = 'http://www.inkscape.org/namespaces/inkscape';
 
 function setText(selector, value) {
@@ -1097,6 +1099,136 @@ function initializeThemeToggle() {
     });
 }
 
+function closeMachineSettingsPanel() {
+    const toggle = document.querySelector('#machine-chip-toggle');
+    const panel = document.querySelector('#machine-settings-panel');
+    if (!toggle || !panel) {
+        return;
+    }
+
+    toggle.setAttribute('aria-expanded', 'false');
+    panel.hidden = true;
+}
+
+function openMachineSettingsPanel() {
+    const toggle = document.querySelector('#machine-chip-toggle');
+    const panel = document.querySelector('#machine-settings-panel');
+    if (!toggle || !panel) {
+        return;
+    }
+
+    toggle.setAttribute('aria-expanded', 'true');
+    panel.hidden = false;
+}
+
+function renderMachineSettings(settingsData) {
+    const list = document.querySelector('#machine-settings-list');
+    if (!list) {
+        return;
+    }
+
+    const config = settingsData?.config || {};
+    const rows = [];
+
+    if (Number.isFinite(config.x_travel) && Number.isFinite(config.y_travel)) {
+        rows.push(['Dimensions', `${config.x_travel}" x ${config.y_travel}"`]);
+    }
+    if (Number.isFinite(config.speed_pendown)) {
+        rows.push(['Pen-down speed', `${config.speed_pendown}%`]);
+    }
+    if (Number.isFinite(config.speed_penup)) {
+        rows.push(['Pen-up speed', `${config.speed_penup}%`]);
+    }
+    if (Number.isFinite(config.accel)) {
+        rows.push(['Acceleration', `${config.accel}%`]);
+    }
+    if (Number.isFinite(config.pen_pos_down)) {
+        rows.push(['Pen-down position', `${config.pen_pos_down}%`]);
+    }
+    if (Number.isFinite(config.pen_pos_up)) {
+        rows.push(['Pen-up position', `${config.pen_pos_up}%`]);
+    }
+    if (typeof config.const_speed === 'boolean') {
+        rows.push(['Constant speed', config.const_speed ? 'Yes' : 'No']);
+    }
+    if (Number.isFinite(config.reordering)) {
+        const reorderingLabels = { 0: 'Least', 1: 'Basic', 2: 'Full', 3: 'Deprecated', 4: 'None' };
+        rows.push(['Reordering', reorderingLabels[config.reordering] ?? config.reordering]);
+    }
+
+    list.innerHTML = '';
+
+    if (rows.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'machine-settings-empty';
+        empty.textContent = config.config_file
+            ? 'No settings available.'
+            : 'No config file found for this model.';
+        list.appendChild(empty);
+        return;
+    }
+
+    for (const [label, value] of rows) {
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.textContent = value;
+        list.append(dt, dd);
+    }
+}
+
+async function fetchMachineSettings(modelNumber) {
+    if (modelNumber !== undefined && modelNumber === lastFetchedMachineModel) {
+        return;
+    }
+
+    try {
+        const query = Number.isFinite(modelNumber) ? `?model=${modelNumber}` : '';
+        const response = await fetch(`/settings.json${query}`, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        currentMachineSettings = await response.json();
+        lastFetchedMachineModel = modelNumber;
+        renderMachineSettings(currentMachineSettings);
+    } catch (error) {
+        console.log('Error fetching machine settings: ' + error);
+    }
+}
+
+function initializeMachineSettingsPanel() {
+    const toggle = document.querySelector('#machine-chip-toggle');
+    const chip = document.querySelector('#machine-chip');
+    if (!toggle || !chip) {
+        return;
+    }
+
+    toggle.addEventListener('click', function(event) {
+        event.stopPropagation();
+        const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+        if (isOpen) {
+            closeMachineSettingsPanel();
+        } else {
+            openMachineSettingsPanel();
+        }
+    });
+
+    document.addEventListener('click', function(event) {
+        if (!chip.contains(event.target)) {
+            closeMachineSettingsPanel();
+        }
+    });
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeMachineSettingsPanel();
+        }
+    });
+
+    fetchMachineSettings();
+}
+
 function setUploadStatus(message, isError = false) {
     const statusElement = document.querySelector('#upload-status');
     statusElement.textContent = message;
@@ -1449,6 +1581,9 @@ function updatePlotterStatus(data) {
 
     // Machine information
     setText("#plotter-machine-chip", data.machine || "Unknown");
+    if (Number.isFinite(data.model_number)) {
+        fetchMachineSettings(data.model_number);
+    }
 
     // Check SVG fit if we have SVG dimensions
     checkSvgFit();
@@ -1843,6 +1978,7 @@ document.querySelector('form[name=plot]').addEventListener("submit", function(ev
 // On page load, check for ?plot= param and load that plot, else load the first
 window.addEventListener("load", function() {
     initializeThemeToggle();
+    initializeMachineSettingsPanel();
     initializeUploadDropZone();
     initializePlaybackControls();
     initializeInfoModal();

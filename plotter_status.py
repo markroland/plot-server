@@ -3,6 +3,15 @@ import os
 
 
 class PlotterStatusService:
+    TRAVEL_DIMENSION_KEYS = {
+        1: ('x_travel_default', 'y_travel_default'),
+        2: ('x_travel_V3A3', 'y_travel_V3A3'),
+        3: ('x_travel_V3XLX', 'y_travel_V3XLX'),
+        4: ('x_travel_MiniKit', 'y_travel_MiniKit'),
+        5: ('x_travel_SEA1', 'y_travel_SEA1'),
+        6: ('x_travel_SEA2', 'y_travel_SEA2'),
+    }
+
     def __init__(self, ad, sem):
         """Store shared plotter dependencies and initialize cached status state."""
         self.ad = ad
@@ -180,6 +189,34 @@ class PlotterStatusService:
             print(f"Error loading config from {config_path}: {error}")
             return {}
 
+    def apply_travel_dimensions(self, config_data, machine_model):
+        """Collapse the model-specific travel dimension fields into generic x_travel/y_travel keys."""
+        x_key, y_key = self.TRAVEL_DIMENSION_KEYS.get(machine_model, (None, None))
+        travel_dimensions = config_data.get('travel_dimensions', {})
+        config_data['x_travel'] = travel_dimensions.get(x_key)
+        config_data['y_travel'] = travel_dimensions.get(y_key)
+        config_data.pop('travel_dimensions', None)
+
+    def get_machine_config(self, model_number=None):
+        """Read machine settings straight from the model's AxiDraw config file, independent of any live connection."""
+        if model_number is None:
+            model_number = self.get_default_model_number()
+
+        config_env_key = f"AXIDRAW_MODEL_{model_number}_CONFIG"
+        config_path = os.environ.get(config_env_key)
+
+        config_data = {}
+        if config_path:
+            config_data = self.load_axidraw_config(config_path)
+            self.apply_travel_dimensions(config_data, model_number)
+
+        config_data['config_file'] = config_path
+
+        return {
+            "model_number": model_number,
+            "config": config_data,
+        }
+
     def get_plotter_status(self):
         """Inspect the connected AxiDraw and return the latest machine status snapshot."""
         status_data = {
@@ -228,28 +265,7 @@ class PlotterStatusService:
                 if config_path:
                     print(f"  Loading config from: {config_path}")
                     config_data = self.load_axidraw_config(config_path)
-
-                    if machine_model == 1:
-                        config_data['x_travel'] = config_data.get('travel_dimensions', {}).get('x_travel_default')
-                        config_data['y_travel'] = config_data.get('travel_dimensions', {}).get('y_travel_default')
-                    elif machine_model == 2:
-                        config_data['x_travel'] = config_data.get('travel_dimensions', {}).get('x_travel_V3A3')
-                        config_data['y_travel'] = config_data.get('travel_dimensions', {}).get('y_travel_V3A3')
-                    elif machine_model == 3:
-                        config_data['x_travel'] = config_data.get('travel_dimensions', {}).get('x_travel_V3XLX')
-                        config_data['y_travel'] = config_data.get('travel_dimensions', {}).get('y_travel_V3XLX')
-                    elif machine_model == 4:
-                        config_data['x_travel'] = config_data.get('travel_dimensions', {}).get('x_travel_MiniKit')
-                        config_data['y_travel'] = config_data.get('travel_dimensions', {}).get('y_travel_MiniKit')
-                    elif machine_model == 5:
-                        config_data['x_travel'] = config_data.get('travel_dimensions', {}).get('x_travel_SEA1')
-                        config_data['y_travel'] = config_data.get('travel_dimensions', {}).get('y_travel_SEA1')
-                    elif machine_model == 6:
-                        config_data['x_travel'] = config_data.get('travel_dimensions', {}).get('x_travel_SEA2')
-                        config_data['y_travel'] = config_data.get('travel_dimensions', {}).get('y_travel_SEA2')
-
-                    if 'travel_dimensions' in config_data:
-                        del config_data['travel_dimensions']
+                    self.apply_travel_dimensions(config_data, machine_model)
 
                     status_data["config"] = config_data
                     status_data["config"]["config_file"] = config_path

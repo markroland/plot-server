@@ -613,6 +613,22 @@ def status_json():
     return response
 
 
+@app.route('/settings.json')
+def settings_json():
+    """Machine settings read directly from the configured AxiDraw config file (no live connection required)."""
+    model_number = request.args.get('model', type=int)
+    settings_data = status_service.get_machine_config(model_number)
+
+    response = Response(json.dumps(settings_data), mimetype='application/json')
+
+    # Set headers to prevent caching
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, public, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+
+    return response
+
+
 @app.route('/logs.json', methods=['GET', 'DELETE'])
 def logs_json():
     """Read or clear persisted plot log entries."""

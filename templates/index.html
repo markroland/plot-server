@@ -29,9 +29,20 @@
                     </svg>
                     <span id="theme-toggle-label">Dark mode</span>
                 </button>
-                <div class="status-chip">
-                    <span class="status-chip__label">Machine</span>
-                    <strong id="plotter-machine-chip">Unknown</strong>
+                <div class="status-chip status-chip--expandable" id="machine-chip">
+                    <button type="button" class="status-chip__toggle" id="machine-chip-toggle" aria-expanded="false" aria-controls="machine-settings-panel">
+                        <span class="status-chip__text">
+                            <span class="status-chip__label">Machine</span>
+                            <strong id="plotter-machine-chip">Unknown</strong>
+                        </span>
+                        <svg class="status-chip__caret" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M7 10l5 5 5-5z"></path>
+                        </svg>
+                    </button>
+                    <div class="machine-settings-panel" id="machine-settings-panel" hidden>
+                        <p class="machine-settings-heading">Machine Settings</p>
+                        <dl class="machine-settings-list" id="machine-settings-list"></dl>
+                    </div>
                 </div>
                 <div class="status-chip">
                     <span class="status-chip__label">Status</span>
