@@ -1089,6 +1089,46 @@ html[data-theme="dark"] #svg-object svg rect {
   margin-bottom: 0;
 }
 
+.carriage-move-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.carriage-move-button {
+  padding: 0.6rem 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.plot-button-reason {
+  margin-top: -0.35rem;
+  min-height: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.secondary-button {
+  background: color-mix(in srgb, var(--action) 12%, var(--panel));
+  color: var(--action);
+}
+
+.secondary-button:hover {
+  background: color-mix(in srgb, var(--action) 20%, var(--panel));
+}
+
+.secondary-button:disabled {
+  background: var(--button-disabled-bg);
+  color: var(--button-disabled-text);
+}
+
+.carriage-coordinates {
+  margin-top: -0.35rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 .plot-setup-card summary {
   cursor: pointer;
   font-weight: 700;

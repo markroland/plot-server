@@ -11,6 +11,14 @@ let busyPollingInterval = null;
 let plotRequestInFlight = false;
 let servoRequestInFlight = false;
 let stopRequestInFlight = false;
+let carriageRequestInFlight = false;
+
+const CARRIAGE_POSITION_LABELS = {
+    'home': 'Home',
+    'top-right': 'Top-Right',
+    'bottom-right': 'Bottom-Right',
+    'bottom-left': 'Bottom-Left',
+};
 
 // Global variables to store plotter and SVG data
 let currentPlotterData = null;
@@ -58,27 +66,68 @@ function doesCurrentSvgFitPlotter() {
     return svgWidth <= plotterWidth && svgHeight <= plotterHeight;
 }
 
+function getPlotButtonDisabledReason({ status, requestInFlight, hasFile, fitsPlotter, isCarriageHome }) {
+    if (requestInFlight) {
+        return 'Plotter busy';
+    }
+    if (status !== 'on') {
+        return 'Plotter not ready';
+    }
+    if (!hasFile) {
+        return 'No plot selected';
+    }
+    if (fitsPlotter === false) {
+        return 'Artwork does not fit the plotter';
+    }
+    if (!isCarriageHome) {
+        return 'Move carriage to Home and "Reset to Home"';
+    }
+    return '';
+}
+
 function syncControlButtons() {
     const plotButton = document.querySelector('#submit_plot');
     const toggleButton = document.querySelector('#toggle-servo-button');
     const stopButton = document.querySelector('#stop-plot-button');
+    const carriageButtons = document.querySelectorAll('.carriage-move-button');
+    const resetHomeButton = document.querySelector('#carriage-reset-home-button');
+    const disableSteppersButton = document.querySelector('#disable-steppers-button');
+    const plotReasonElement = document.querySelector('#plot-button-reason');
 
     if (!plotButton || !toggleButton || !stopButton) {
         return;
     }
 
     const status = currentPlotterData?.status;
-    const requestInFlight = plotRequestInFlight || servoRequestInFlight || stopRequestInFlight;
+    const requestInFlight = plotRequestInFlight || servoRequestInFlight || stopRequestInFlight || carriageRequestInFlight;
     const hasFile = hasSelectedFilename();
     const fitsPlotter = doesCurrentSvgFitPlotter();
     const isPlotRunning = currentPlotterData?.plot_state === 'plotting' || plotRequestInFlight;
-    const canPlot = status === 'on' && hasFile && fitsPlotter !== false && !requestInFlight;
+    const isCarriageHome = currentPlotterData?.carriage_position === 'home';
+    const canPlot = status === 'on' && hasFile && fitsPlotter !== false && !requestInFlight && isCarriageHome;
     const canToggleServo = status === 'on' && !requestInFlight;
+    const canMoveCarriage = status === 'on' && !requestInFlight;
+    const canDisableSteppers = status === 'on' && !requestInFlight && currentPlotterData?.steppers_energized === true;
     const canStopPlot = isPlotRunning && !stopRequestInFlight;
 
     plotButton.disabled = !canPlot;
     toggleButton.disabled = !canToggleServo;
     stopButton.disabled = !canStopPlot;
+    carriageButtons.forEach((button) => {
+        button.disabled = !canMoveCarriage;
+    });
+    if (resetHomeButton) {
+        resetHomeButton.disabled = !canMoveCarriage;
+    }
+    if (disableSteppersButton) {
+        disableSteppersButton.disabled = !canDisableSteppers;
+    }
+
+    const reason = canPlot ? '' : getPlotButtonDisabledReason({ status, requestInFlight, hasFile, fitsPlotter, isCarriageHome });
+    plotButton.title = reason || 'Plot';
+    if (plotReasonElement) {
+        plotReasonElement.textContent = reason;
+    }
 }
 
 function setBusyStatusLocally() {
@@ -1391,13 +1440,158 @@ function showToggleServoStatus(message, isError = false) {
     }
 
     plotterControlStatusTimeout = setTimeout(() => {
-        statusElement.textContent = '';
+        statusElement.textContent = 'Awaiting Command';
         statusElement.className = 'plotter-control-status';
     }, 2500);
 }
 
 function showStopPlotStatus(message, isError = false) {
     showToggleServoStatus(message, isError);
+}
+
+async function moveCarriage(position) {
+    const button = document.querySelector(`.carriage-move-button[data-position="${position}"]`);
+    if (!button || button.disabled) {
+        return;
+    }
+
+    const label = CARRIAGE_POSITION_LABELS[position] || position;
+
+    carriageRequestInFlight = true;
+    setBusyStatusLocally();
+    syncControlButtons();
+    showToggleServoStatus(`Moving to ${label}...`);
+
+    try {
+        const response = await fetch(`/carriage/move?position=${encodeURIComponent(position)}`, { method: 'POST' });
+        if (response.status === 503) {
+            showToggleServoStatus('Plotter busy', true);
+            return;
+        }
+
+        if (!response.ok) {
+            let errorMessage = `Carriage move failed (${response.status})`;
+            try {
+                const errorPayload = await response.json();
+                if (errorPayload && errorPayload.error) {
+                    errorMessage = errorPayload.error;
+                }
+            } catch (parseError) {
+                // Keep fallback message when response is not JSON.
+            }
+            throw new Error(errorMessage);
+        }
+
+        showToggleServoStatus(`Moved to ${label}`);
+        await refreshPlotterStatus();
+    } catch (error) {
+        console.error('Failed to move carriage:', error);
+        showToggleServoStatus(error.message || 'Move failed', true);
+    } finally {
+        carriageRequestInFlight = false;
+        await refreshPlotterStatus();
+    }
+}
+
+async function resetCarriageHome() {
+    const button = document.querySelector('#carriage-reset-home-button');
+    if (!button || button.disabled) {
+        return;
+    }
+
+    carriageRequestInFlight = true;
+    syncControlButtons();
+    showToggleServoStatus('Setting Home...');
+
+    try {
+        const response = await fetch('/carriage/reset-home', { method: 'POST' });
+
+        if (!response.ok) {
+            let errorMessage = `Reset failed (${response.status})`;
+            try {
+                const errorPayload = await response.json();
+                if (errorPayload && errorPayload.error) {
+                    errorMessage = errorPayload.error;
+                }
+            } catch (parseError) {
+                // Keep fallback message when response is not JSON.
+            }
+            throw new Error(errorMessage);
+        }
+
+        showToggleServoStatus('Carriage set as Home');
+        await refreshPlotterStatus();
+    } catch (error) {
+        console.error('Failed to reset carriage home:', error);
+        showToggleServoStatus(error.message || 'Reset failed', true);
+    } finally {
+        carriageRequestInFlight = false;
+        await refreshPlotterStatus();
+    }
+}
+
+async function disableSteppers() {
+    const button = document.querySelector('#disable-steppers-button');
+    if (!button || button.disabled) {
+        return;
+    }
+
+    carriageRequestInFlight = true;
+    setBusyStatusLocally();
+    syncControlButtons();
+    showToggleServoStatus('Disabling steppers...');
+
+    try {
+        const response = await fetch('/steppers/disable', { method: 'POST' });
+        if (response.status === 503) {
+            showToggleServoStatus('Plotter busy', true);
+            return;
+        }
+
+        if (!response.ok) {
+            let errorMessage = `Disable failed (${response.status})`;
+            try {
+                const errorPayload = await response.json();
+                if (errorPayload && errorPayload.error) {
+                    errorMessage = errorPayload.error;
+                }
+            } catch (parseError) {
+                // Keep fallback message when response is not JSON.
+            }
+            throw new Error(errorMessage);
+        }
+
+        showToggleServoStatus('Steppers disabled');
+        await refreshPlotterStatus();
+    } catch (error) {
+        console.error('Failed to disable steppers:', error);
+        showToggleServoStatus(error.message || 'Disable failed', true);
+    } finally {
+        carriageRequestInFlight = false;
+        await refreshPlotterStatus();
+    }
+}
+
+function formatFixedNoNegativeZero(value, digits) {
+    // Tiny floating-point noise (e.g. -0.0001) rounds to "-0.00" via toFixed, which reads
+    // oddly for a value that's effectively zero. Snap it to a true (positive) zero first.
+    const factor = 10 ** digits;
+    let rounded = Math.round(value * factor) / factor;
+    if (rounded === 0) {
+        rounded = 0; // Normalizes -0 to 0.
+    }
+    return rounded.toFixed(digits);
+}
+
+function formatCarriagePosition(coordinates) {
+    if (!coordinates || !Number.isFinite(coordinates.x) || !Number.isFinite(coordinates.y)) {
+        return 'Position: Unknown';
+    }
+
+    const mmX = coordinates.x * 25.4;
+    const mmY = coordinates.y * 25.4;
+    return `Position: ${formatFixedNoNegativeZero(mmX, 1)}mm, ${formatFixedNoNegativeZero(mmY, 1)}mm ` +
+        `(${formatFixedNoNegativeZero(coordinates.x, 2)}", ${formatFixedNoNegativeZero(coordinates.y, 2)}")`;
 }
 
 async function toggleServo() {
@@ -1534,6 +1728,7 @@ function updatePlotterStatus(data) {
     // Store plotter data globally
     currentPlotterData = data;
     syncActivePlotFromStatus(data);
+    setText('#carriage-coordinates', formatCarriagePosition(data.carriage_coordinates));
 
     // Show status with color coding
     let statusText = data.status;
@@ -1947,6 +2142,20 @@ document.querySelector('#delete-file-button').addEventListener('click', function
 
 document.querySelector('#toggle-servo-button').addEventListener('click', function() {
     toggleServo();
+});
+
+document.querySelectorAll('.carriage-move-button').forEach((button) => {
+    button.addEventListener('click', function() {
+        moveCarriage(button.dataset.position);
+    });
+});
+
+document.querySelector('#carriage-reset-home-button').addEventListener('click', function() {
+    resetCarriageHome();
+});
+
+document.querySelector('#disable-steppers-button').addEventListener('click', function() {
+    disableSteppers();
 });
 
 document.querySelector('#stop-plot-button').addEventListener('click', function() {
