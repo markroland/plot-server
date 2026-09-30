@@ -209,6 +209,7 @@
 
                         <input type="hidden" name="filename" value="" />
                         <button id="submit_plot" type="submit" disabled title="Plotter not ready">Plot</button>
+                        <div id="plot-button-reason" class="plot-button-reason" aria-live="polite">Plotter not ready</div>
                         <div class="plot-countdown" aria-live="polite">
                             <span class="plot-countdown__label">Plot Time</span>
                             <span id="preview-countdown" class="plot-countdown__value">00:00:00</span>
@@ -232,8 +233,17 @@
                     <div class="plotter-controls-section">
                         <p class="eyebrow">Plotter Control</p>
                         <button id="toggle-servo-button" type="button" title="Toggle Servo">Toggle Servo</button>
+                        <div class="carriage-move-buttons" role="group" aria-label="Move carriage">
+                            <button class="carriage-move-button" type="button" data-position="home" title="Move carriage to Home (top-left)" disabled>Home</button>
+                            <button class="carriage-move-button" type="button" data-position="top-right" title="Move carriage to top-right" disabled>TR</button>
+                            <button class="carriage-move-button" type="button" data-position="bottom-right" title="Move carriage to bottom-right" disabled>BR</button>
+                            <button class="carriage-move-button" type="button" data-position="bottom-left" title="Move carriage to bottom-left" disabled>BL</button>
+                        </div>
+                        <button id="carriage-reset-home-button" class="secondary-button" type="button" title="Tell the system the carriage is already at home, without moving it" disabled>Reset to Home</button>
+                        <div id="carriage-coordinates" class="carriage-coordinates" aria-live="polite">Position: Unknown</div>
+                        <button id="disable-steppers-button" class="secondary-button" type="button" title="Disable the XY stepper motors so the carriage can be moved by hand" disabled>Disable Steppers</button>
                         <button id="stop-plot-button" type="button" title="Stop Plot" disabled>Stop Plot</button>
-                        <div id="plotter-control-status" class="plotter-control-status" aria-live="polite"></div>
+                        <div id="plotter-control-status" class="plotter-control-status" aria-live="polite">Awaiting Command</div>
                     </div>
 
                 </section>

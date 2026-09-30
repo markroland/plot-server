@@ -20,7 +20,14 @@ from axicli import utils as axicli_utils
 from flask import Flask, request, Response, render_template, send_file
 from flask_cors import CORS
 import os
-from plotter_service import plot, preview_plot, toggle_servo
+from plotter_service import (
+    CARRIAGE_POSITIONS,
+    disable_steppers,
+    move_carriage,
+    plot,
+    preview_plot,
+    toggle_servo,
+)
 from plotter_status import PlotterStatusService, resolve_config_path
 from preview_parser import parse_plot_output, parse_preview_output
 from svg_library import (
@@ -48,6 +55,22 @@ runtime_plot_state = {
         "success": None,
         "servo_state": "unknown",
     },
+}
+
+# The AxiDraw has no absolute position feedback, so "home" is only known by tracking our
+# own move/reset/plot commands. A server restart loses that trail -- but by the usual
+# AxiDraw convention, the carriage is physically at home when the machine is powered on,
+# so assume "home" at startup rather than "unknown" (the same assumption move_carriage()
+# falls back to when reference_steps is None). reference_steps is the raw motor step
+# reading last confirmed to correspond to home; coordinates is the last known (x, y)
+# location in inches; steppers_energized tracks whether we last left the XY motors
+# powered (and thus able to hold/trust a position).
+carriage_state_lock = threading.Lock()
+runtime_carriage_state = {
+    "position": "home",
+    "reference_steps": None,
+    "coordinates": {"x": 0.0, "y": 0.0},
+    "steppers_energized": False,
 }
 
 # Create an AxiDraw class instance
@@ -133,6 +156,18 @@ def get_runtime_plot_state_snapshot():
         }
 
 
+def set_carriage_state(**updates):
+    """Update one or more fields of the carriage runtime state (position/reference_steps/coordinates)."""
+    with carriage_state_lock:
+        runtime_carriage_state.update(updates)
+
+
+def get_carriage_state_snapshot():
+    """Return a copy of the in-memory carriage state for response payloads and move requests."""
+    with carriage_state_lock:
+        return dict(runtime_carriage_state)
+
+
 def apply_runtime_state_to_status(status_data):
     """Merge local runtime controls into hardware status payload."""
     runtime_state = get_runtime_plot_state_snapshot()
@@ -145,6 +180,11 @@ def apply_runtime_state_to_status(status_data):
 
     status_data["stop_requested"] = runtime_state["stop_requested"]
     status_data["last_stop"] = runtime_state["last_stop"]
+
+    carriage_state = get_carriage_state_snapshot()
+    status_data["carriage_position"] = carriage_state["position"]
+    status_data["carriage_coordinates"] = carriage_state["coordinates"]
+    status_data["steppers_energized"] = carriage_state["steppers_energized"]
 
     # Lets a freshly loaded page resume the countdown. server_time is included so
     # the client can compute time remaining without trusting its own clock.
@@ -454,8 +494,12 @@ def plot_request(file):
                     'estimate': estimate,
                 })
                 set_runtime_plot_state(is_plotting=True, stop_requested=False)
+                set_carriage_state(position="unknown", coordinates=None, steppers_energized=True)
                 plot_output = plot(ad, filepath, layer, model_number)
                 completed_at = int(time.time())
+                # plot() returns the carriage to its configured start position (home, by
+                # default) and disables the XY motors once drawing finishes.
+                set_carriage_state(position="home", coordinates={'x': 0.0, 'y': 0.0}, reference_steps=None, steppers_energized=False)
 
                 try:
                     plot_metrics = parse_plot_output(plot_output)
@@ -682,6 +726,8 @@ def stop_plot():
         stop_result["error"] = str(error)
 
     set_runtime_plot_state(last_stop=stop_result)
+    if stop_result["disable_xy"]:
+        set_carriage_state(steppers_energized=False)
 
     append_plot_log_entry({
         'time': format_log_timestamp(stop_result['requested_at']),
@@ -730,6 +776,92 @@ def servo_toggle():
         return Response(json.dumps({'status': 'ok'}), mimetype='application/json')
     except Exception as error:
         print(f"[ERROR] Exception during servo toggle: {error}")
+        return Response(json.dumps({'error': str(error)}), status=500, mimetype='application/json')
+    finally:
+        sem.release()
+
+
+@app.route('/carriage/move', methods=['POST'])
+def carriage_move():
+    """Move the AxiDraw carriage (pen up) to a named reference corner of the travel area."""
+    position = request.args.get('position', default='', type=str)
+    if position not in CARRIAGE_POSITIONS:
+        return Response(json.dumps({'error': f'Invalid position: {position}'}), status=400, mimetype='application/json')
+
+    if not sem.acquire(True, 1.0):
+        return Response(json.dumps({'error': 'Busy'}), status=503, mimetype='application/json')
+
+    try:
+        model_number = get_active_model_number()
+        move_ad = build_axidraw_for_model(model_number)
+        reference_steps = get_carriage_state_snapshot()["reference_steps"]
+        print(f"[INFO] Carriage move request: position={position}, model={model_number}")
+        (target_x, target_y), updated_reference_steps = move_carriage(move_ad, position, model_number, reference_steps)
+        coordinates = {'x': target_x, 'y': target_y}
+        set_carriage_state(
+            position=position,
+            coordinates=coordinates,
+            reference_steps=updated_reference_steps,
+            steppers_energized=True,
+        )
+        print("[INFO] Carriage move command completed")
+        return Response(json.dumps({
+            'status': 'ok',
+            'carriage_position': position,
+            'carriage_coordinates': coordinates,
+        }), mimetype='application/json')
+    except Exception as error:
+        print(f"[ERROR] Exception during carriage move: {error}")
+        set_carriage_state(position="unknown", coordinates=None)
+        return Response(json.dumps({'error': str(error)}), status=500, mimetype='application/json')
+    finally:
+        sem.release()
+
+
+@app.route('/carriage/reset-home', methods=['POST'])
+def carriage_reset_home():
+    """Mark the carriage's current physical position as home -- a pure software reset.
+
+    Use this after the carriage has been repositioned by hand (e.g. to recover from a
+    stall or an incorrect move). This doesn't touch the AxiDraw at all (so it can't
+    trigger the pen or motors) -- it just clears the app's tracking, trusting that
+    wherever the carriage physically is right now is home. The AxiDraw's home corner is
+    always (0, 0) inches by convention. The next carriage move will calibrate its own
+    step-position baseline from this reset, rather than from a stale prior one.
+    """
+    if get_runtime_plot_state_snapshot()["is_plotting"]:
+        return Response(json.dumps({'error': 'Plotter busy'}), status=409, mimetype='application/json')
+
+    coordinates = {'x': 0.0, 'y': 0.0}
+    set_carriage_state(position="home", coordinates=coordinates, reference_steps=None)
+    print("[INFO] Carriage reset-home: tracking reset to home (0, 0), no hardware contacted")
+    return Response(json.dumps({
+        'status': 'ok',
+        'carriage_position': 'home',
+        'carriage_coordinates': coordinates,
+    }), mimetype='application/json')
+
+
+@app.route('/steppers/disable', methods=['POST'])
+def steppers_disable():
+    """Disable the AxiDraw's XY stepper motors so the carriage can be repositioned by hand.
+
+    Cutting power to the motors means the carriage is no longer held in place, so any
+    tracked position is no longer trustworthy until the next move or Reset to Home.
+    """
+    if not sem.acquire(True, 1.0):
+        return Response(json.dumps({'error': 'Busy'}), status=503, mimetype='application/json')
+
+    try:
+        model_number = get_active_model_number()
+        disable_ad = build_axidraw_for_model(model_number)
+        print(f"[INFO] Disable steppers request: model={model_number}")
+        disable_steppers(disable_ad, model_number)
+        set_carriage_state(position="unknown", coordinates=None, steppers_energized=False)
+        print("[INFO] Disable steppers command completed")
+        return Response(json.dumps({'status': 'ok', 'steppers_energized': False}), mimetype='application/json')
+    except Exception as error:
+        print(f"[ERROR] Exception during disable steppers: {error}")
         return Response(json.dumps({'error': str(error)}), status=500, mimetype='application/json')
     finally:
         sem.release()
