@@ -21,7 +21,7 @@ from flask import Flask, request, Response, render_template, send_file
 from flask_cors import CORS
 import os
 from plotter_service import plot, preview_plot, toggle_servo
-from plotter_status import PlotterStatusService
+from plotter_status import PlotterStatusService, resolve_config_path
 from preview_parser import parse_plot_output, parse_preview_output
 from svg_library import (
     build_file_entry,
@@ -56,7 +56,7 @@ status_service = PlotterStatusService(status_ad, sem)
 
 # Create new Flask app
 app = Flask(__name__)
-APP_VERSION = "1.2.0"
+APP_VERSION = os.environ.get("APP_VERSION", 1)
 
 # Enable CORS
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -199,7 +199,7 @@ def build_axidraw_for_model(model_number):
     """Construct an AxiDraw instance using the device's config file (AXIDRAW_MODEL_<n>_CONFIG),
     merged over AxiDraw's built-in defaults -- the same mechanism axicli uses for `--config`.
     Falls back to plain defaults if no config file is set for this model."""
-    config_path = os.environ.get(f"AXIDRAW_MODEL_{model_number}_CONFIG")
+    config_path = resolve_config_path(os.environ.get(f"AXIDRAW_MODEL_{model_number}_CONFIG"))
 
     if not config_path or not os.path.exists(config_path):
         return axidraw.AxiDraw()

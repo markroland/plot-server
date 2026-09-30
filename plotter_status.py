@@ -1,6 +1,15 @@
 import importlib.util
 import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def resolve_config_path(config_path):
+    """Resolve a config path from the environment relative to the project root, unless already absolute."""
+    if not config_path or os.path.isabs(config_path):
+        return config_path
+    return os.path.join(BASE_DIR, config_path)
+
 
 class PlotterStatusService:
     TRAVEL_DIMENSION_KEYS = {
@@ -203,7 +212,7 @@ class PlotterStatusService:
             model_number = self.get_default_model_number()
 
         config_env_key = f"AXIDRAW_MODEL_{model_number}_CONFIG"
-        config_path = os.environ.get(config_env_key)
+        config_path = resolve_config_path(os.environ.get(config_env_key))
 
         config_data = {}
         if config_path:
@@ -260,7 +269,7 @@ class PlotterStatusService:
                 status_data["model_number"] = machine_model
 
                 config_env_key = f"AXIDRAW_MODEL_{machine_model}_CONFIG"
-                config_path = os.environ.get(config_env_key)
+                config_path = resolve_config_path(os.environ.get(config_env_key))
 
                 if config_path:
                     print(f"  Loading config from: {config_path}")
