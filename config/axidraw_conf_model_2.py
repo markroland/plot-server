@@ -34,7 +34,7 @@ Similarly, values set within Inkscape are ignored when using the CLI or
 
 mode = 'plot'           # Operational mode or GUI tab. Default: 'plot'
 
-speed_pendown = 25      # Maximum plotting speed, when pen is down (1-100)
+speed_pendown = 15      # Maximum plotting speed, when pen is down (1-100)
 speed_penup = 75        # Maximum transit speed, when pen is up (1-100)
 accel = 75              # Acceleration rate factor (1-100)
 
@@ -67,7 +67,7 @@ rendering = 3           # Preview mode rendering option (0-3):
                             # 2: Render only pen-up movement
                             # 3: Render all movement (Default)
 
-model = 4               # AxiDraw Model (1-6)
+model = 2               # AxiDraw Model (1-6)
                             # 1: AxiDraw V2 or V3 (Default). 2: AxiDraw V3/A3 or SE/A3.
                             # 3: AxiDraw V3 XLX. 4: AxiDraw MiniKit.
                             # 5: AxiDraw SE/A1.  6: AxiDraw SE/A2.

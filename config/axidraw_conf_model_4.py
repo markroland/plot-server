@@ -67,7 +67,7 @@ rendering = 3           # Preview mode rendering option (0-3):
                             # 2: Render only pen-up movement
                             # 3: Render all movement (Default)
 
-model = 2               # AxiDraw Model (1-6)
+model = 4               # AxiDraw Model (1-6)
                             # 1: AxiDraw V2 or V3 (Default). 2: AxiDraw V3/A3 or SE/A3.
                             # 3: AxiDraw V3 XLX. 4: AxiDraw MiniKit.
                             # 5: AxiDraw SE/A1.  6: AxiDraw SE/A2.
