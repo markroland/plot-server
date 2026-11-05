@@ -101,8 +101,11 @@ plot_log_file_lock = threading.Lock()
 current_plot_file_lock = threading.Lock()
 
 
-def load_csv_options(file_path):
-    """Load one option per line from a CSV file (first column only)."""
+def load_csv_options(file_path, has_header=False):
+    """Load one option per line from a CSV file (first column only).
+
+    If has_header is True, the first row is treated as a header and skipped.
+    """
     options = []
 
     if not os.path.exists(file_path):
@@ -112,6 +115,8 @@ def load_csv_options(file_path):
     try:
         with open(file_path, newline='', encoding='utf-8') as csv_file:
             reader = csv.reader(csv_file)
+            if has_header:
+                next(reader, None)
             for row in reader:
                 if not row:
                     continue
@@ -131,7 +136,7 @@ def load_csv_options(file_path):
     return options
 
 
-TOOL_OPTIONS = load_csv_options(TOOLS_CSV_PATH)
+TOOL_OPTIONS = load_csv_options(TOOLS_CSV_PATH, has_header=True)
 MATERIAL_OPTIONS = load_csv_options(MATERIAL_CSV_PATH)
 
 
