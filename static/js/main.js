@@ -98,6 +98,8 @@ function syncControlButtons() {
         return;
     }
 
+    syncAddToQueueButton();
+
     const status = currentPlotterData?.status;
     const requestInFlight = plotRequestInFlight || servoRequestInFlight || stopRequestInFlight || carriageRequestInFlight;
     const hasFile = hasSelectedFilename();
@@ -2016,31 +2018,39 @@ function initializeFileThumbnails() {
     });
 }
 
+// Select a file from the library and load its preview, optionally with one layer chosen.
+async function selectPlotFromLibrary(link, layerValue = '') {
+    // Clear any "selected" list items
+    document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
+
+    // Apply class to highlight the chosen item
+    const selectedListItem = link.closest('li');
+    selectedListItem.classList.add('selected');
+    scrollLibraryItemIntoView(selectedListItem);
+
+    // Parse file request
+    const filepath = link.getAttribute("href");
+    const filename = link.getAttribute("data-filename");
+
+    setSelectedPlot(filename);
+
+    // Update the URL with ?plot={plotname} (no reload)
+    const url = new URL(window.location);
+    url.searchParams.set('plot', filename);
+    if (layerValue) {
+        url.searchParams.set('layer', layerValue);
+    } else {
+        url.searchParams.delete('layer');
+    }
+    window.history.replaceState({}, '', url);
+
+    await loadAnimatedPreview(filepath, filename, layerValue);
+}
+
 document.querySelectorAll("#files a").forEach(item => {
     item.addEventListener("click", async function(event){
         event.preventDefault();
-
-        // Clear any "selected" list items
-        document.querySelectorAll('ol#files li.selected').forEach((el) => el.classList.remove('selected'));
-
-        // Apply class to highlight clicked item
-        const selectedListItem = event.currentTarget.closest('li');
-        selectedListItem.classList.add('selected');
-        scrollLibraryItemIntoView(selectedListItem);
-
-        // Parse file request
-        let filepath = this.getAttribute("href");
-        let filename = this.getAttribute("data-filename");
-
-        setSelectedPlot(filename);
-
-        // Update the URL with ?plot={plotname} (no reload)
-        const url = new URL(window.location);
-        url.searchParams.set('plot', filename);
-        url.searchParams.delete('layer');
-        window.history.replaceState({}, '', url);
-
-        await loadAnimatedPreview(filepath, filename, '');
+        await selectPlotFromLibrary(event.currentTarget);
     });
 });
 
@@ -2174,8 +2184,17 @@ document.querySelector('form[name=plot]').addEventListener("submit", function(ev
         layer = null;
     }
 
+    // If this plot was loaded from the queue (and still matches it), take it off the queue once done.
+    const queuedEntry = getMatchingLoadedQueueEntry(filename, layer);
+
     // Set plot request
     send_plot_request(filename, layer)
+        .then((payload) => {
+            if (queuedEntry) {
+                return removeQueueEntry(queuedEntry.id).then(() => payload);
+            }
+            return payload;
+        })
         .catch((error) => {
             console.error('Failed to start plot request:', error);
             window.alert(error.message || 'Failed to start plot');
@@ -2193,6 +2212,7 @@ window.addEventListener("load", function() {
     initializeInfoModal();
     initializeFileThumbnails();
     initializePlotLog();
+    initializePlotQueue();
     const urlParams = new URLSearchParams(window.location.search);
     let plotParam = urlParams.get('plot');
     let layerParam = urlParams.get('layer') || '';
@@ -2233,6 +2253,192 @@ document.querySelector('#library-search').addEventListener('input', function(eve
         item.style.display = filename.includes(query) ? '' : 'none';
     });
 });
+
+// Plot queue: plots set up ahead of time (file, title, layer, tool, material) and saved on
+// the server, so they can be prepared with no plotter ready and run later.
+let plotQueueEntries = [];
+let loadedQueueEntryId = null;
+
+function syncAddToQueueButton() {
+    const button = document.querySelector('#add-to-queue');
+    if (!button) {
+        return;
+    }
+
+    const hasFile = hasSelectedFilename();
+    button.disabled = !hasFile;
+    button.title = hasFile ? 'Save these settings to the plot queue' : 'Select a file first';
+}
+
+function formatQueueLayer(layer) {
+    return layer ? layer : 'all';
+}
+
+function updatePlotQueueUi() {
+    const emptyElement = document.querySelector('#plot-queue-empty');
+    const tableElement = document.querySelector('#plot-queue-table');
+    const bodyElement = document.querySelector('#plot-queue-body');
+
+    if (!emptyElement || !tableElement || !bodyElement) {
+        return;
+    }
+
+    emptyElement.hidden = plotQueueEntries.length > 0;
+    tableElement.hidden = plotQueueEntries.length === 0;
+
+    bodyElement.innerHTML = plotQueueEntries.map((entry, index) => `
+        <tr data-queue-id="${escapeHtml(entry.id)}"${entry.id === loadedQueueEntryId ? ' class="queue-row--loaded"' : ''}>
+            <td>${index + 1}</td>
+            <td>${entry.added_at ? formatLogTime(formatCompactTimestamp(entry.added_at)) : '-'}</td>
+            <td>${formatLogCellValue(entry.title)}</td>
+            <td>${formatLogFilename(entry.file, entry.layer)}</td>
+            <td>${escapeHtml(formatQueueLayer(entry.layer))}</td>
+            <td>${formatLogCellValue(entry.tool)}</td>
+            <td>${formatLogCellValue(entry.media)}</td>
+            <td>
+                <div class="queue-row-actions">
+                    <button type="button" class="secondary-button" data-queue-action="load" title="Load into Send to Plotter">Load</button>
+                    <button type="button" class="queue-remove-button" data-queue-action="remove" title="Remove from queue">Remove</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function loadPlotQueue() {
+    try {
+        const response = await fetch('/queue.json', { cache: 'no-store' });
+        if (!response.ok) {
+            return;
+        }
+
+        const payload = await response.json();
+        plotQueueEntries = Array.isArray(payload?.entries) ? payload.entries : [];
+        updatePlotQueueUi();
+    } catch (error) {
+        console.error('Failed to load plot queue:', error);
+    }
+}
+
+async function addCurrentPlotToQueue() {
+    const context = getCurrentPlotContext();
+    if (!context.filename) {
+        return;
+    }
+
+    const button = document.querySelector('#add-to-queue');
+    button.disabled = true;
+
+    try {
+        const layerValue = document.querySelector('select[name=layer]')?.value || '';
+        const response = await fetch('/queue.json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file: context.filename,
+                title: context.title,
+                layer: layerValue,
+                tool: context.tool,
+                media: context.media,
+            }),
+        });
+
+        if (!response.ok) {
+            const details = await response.json().catch(() => ({}));
+            throw new Error(details.error || `Failed to queue plot (${response.status})`);
+        }
+
+        await loadPlotQueue();
+    } catch (error) {
+        console.error('Failed to add plot to queue:', error);
+        window.alert(error.message || 'Failed to add plot to queue');
+    } finally {
+        syncAddToQueueButton();
+    }
+}
+
+async function removeQueueEntry(entryId) {
+    try {
+        await fetch(`/queue/${encodeURIComponent(entryId)}`, { method: 'DELETE' });
+    } catch (error) {
+        console.error('Failed to remove queue entry:', error);
+    }
+
+    if (loadedQueueEntryId === entryId) {
+        loadedQueueEntryId = null;
+    }
+    await loadPlotQueue();
+}
+
+// Put a queued plot's settings into the Send to Plotter form. It still has to be plotted
+// with the Plot button, so the preview, fit check and plotter-ready checks all still apply.
+async function loadQueueEntry(entry) {
+    const link = Array.from(document.querySelectorAll('ol#files li a'))
+        .find((anchor) => anchor.getAttribute('data-filename') === entry.file);
+
+    if (!link) {
+        window.alert(`"${entry.file}" is no longer in the library. Remove it from the queue or restore the file.`);
+        return;
+    }
+
+    loadedQueueEntryId = entry.id;
+    updatePlotQueueUi();
+
+    await selectPlotFromLibrary(link, entry.layer || '');
+
+    const titleInput = document.querySelector('input[name=title]');
+    if (titleInput) {
+        titleInput.value = entry.title || '';
+    }
+
+    // Tool/material lists come from CSV files, so a saved value may no longer be an option.
+    [['select[name=tool]', entry.tool], ['select[name=material]', entry.media]].forEach(([selector, value]) => {
+        const select = document.querySelector(selector);
+        if (select) {
+            select.value = value;
+            if (select.value !== value) {
+                select.value = 'None';
+            }
+        }
+    });
+
+    updatePlotCommand();
+}
+
+// The queue entry that was loaded and is still what the form is about to plot, if any.
+function getMatchingLoadedQueueEntry(filename, layer) {
+    const entry = plotQueueEntries.find((candidate) => candidate.id === loadedQueueEntryId);
+    if (!entry || entry.file !== filename) {
+        return null;
+    }
+
+    return String(entry.layer || '') === String(layer ?? '') ? entry : null;
+}
+
+function initializePlotQueue() {
+    document.querySelector('#add-to-queue')?.addEventListener('click', addCurrentPlotToQueue);
+
+    document.querySelector('#plot-queue-body')?.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-queue-action]');
+        const row = event.target.closest('tr[data-queue-id]');
+        if (!button || !row) {
+            return;
+        }
+
+        const entry = plotQueueEntries.find((candidate) => candidate.id === row.getAttribute('data-queue-id'));
+        if (!entry) {
+            return;
+        }
+
+        if (button.getAttribute('data-queue-action') === 'load') {
+            loadQueueEntry(entry);
+        } else {
+            removeQueueEntry(entry.id);
+        }
+    });
+
+    loadPlotQueue();
+}
 
 // Send an API request to start a plot
 function send_plot_request(filename, layer = null){

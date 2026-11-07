@@ -209,6 +209,7 @@
 
                         <input type="hidden" name="filename" value="" />
                         <button id="submit_plot" type="submit" disabled title="Plotter not ready">Plot</button>
+                        <button id="add-to-queue" class="secondary-button" type="button" disabled title="Select a file first">Add to Queue</button>
                         <div id="plot-button-reason" class="plot-button-reason" aria-live="polite">Plotter not ready</div>
                         <div class="plot-countdown" aria-live="polite">
                             <span class="plot-countdown__label">Plot Time</span>
@@ -284,6 +285,33 @@
                     </div>
                 </section>
             </aside>
+
+            <section class="log-panel queue-panel card" aria-label="Plot queue">
+                <div class="panel-heading compact">
+                    <div>
+                        <p class="eyebrow">Plot Queue</p>
+                        <h2>Up Next</h2>
+                    </div>
+                </div>
+                <div id="plot-queue-empty" class="plot-log-empty">Nothing queued. Set up a plot and choose Add to Queue.</div>
+                <div class="plot-log-table-wrap">
+                    <table class="plot-log-table" id="plot-queue-table" hidden>
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">Added</th>
+                                <th scope="col">Title</th>
+                                <th scope="col">Filename</th>
+                                <th scope="col">Layer</th>
+                                <th scope="col">Tool</th>
+                                <th scope="col">Media</th>
+                                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="plot-queue-body"></tbody>
+                    </table>
+                </div>
+            </section>
 
             <section class="log-panel card" aria-label="Plot log">
                 <div class="panel-heading compact">

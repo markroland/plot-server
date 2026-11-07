@@ -28,6 +28,7 @@ from plotter_service import (
     preview_plot,
     toggle_servo,
 )
+from plot_queue_store import PlotQueueStore
 from plotter_status import PlotterStatusService, resolve_config_path
 from preview_parser import parse_plot_output, parse_preview_output
 from svg_library import (
@@ -94,6 +95,8 @@ art_dir = app.config['UPLOAD_FOLDER']
 LOG_DIR = os.path.join(BASE_DIR, 'log')
 PLOT_LOG_FILE = os.path.join(LOG_DIR, 'plot-log.jsonl')
 CURRENT_PLOT_FILE = os.path.join(LOG_DIR, 'current-plot.json')
+PLOT_QUEUE_FILE = os.path.join(LOG_DIR, 'plot-queue.json')
+plot_queue_store = PlotQueueStore(PLOT_QUEUE_FILE)
 
 TOOLS_CSV_PATH = os.path.join(BASE_DIR, 'tools.csv')
 MATERIAL_CSV_PATH = os.path.join(BASE_DIR, 'material.csv')
@@ -767,6 +770,40 @@ def logs_json():
         return Response(json.dumps({'status': 'ok'}), mimetype='application/json')
 
     return Response(json.dumps({'entries': load_plot_log_entries()}), mimetype='application/json')
+
+
+@app.route('/queue.json', methods=['GET', 'POST'])
+def queue_json():
+    """List the saved plot queue, or add a plot (file, title, layer, tool, media) to it.
+
+    Works whether or not a plotter is connected: it only stores settings for later.
+    """
+    if request.method == 'GET':
+        return Response(json.dumps({'entries': plot_queue_store.list()}), mimetype='application/json')
+
+    data = request.get_json(silent=True) or {}
+    file = data.get('file')
+    filepath = resolve_artwork_path(file) if isinstance(file, str) and file else None
+
+    if not filepath or not os.path.isfile(filepath):
+        return Response(json.dumps({'error': 'File not found'}), status=400, mimetype='application/json')
+
+    entry = plot_queue_store.add(
+        file=file,
+        title=str(data.get('title') or ''),
+        layer=data.get('layer', ''),
+        tool=str(data.get('tool') or 'None'),
+        media=str(data.get('media') or 'None'),
+    )
+    return Response(json.dumps(entry), status=201, mimetype='application/json')
+
+
+@app.route('/queue/<entry_id>', methods=['DELETE'])
+def queue_entry(entry_id):
+    """Remove one entry from the saved plot queue."""
+    if not plot_queue_store.remove(entry_id):
+        return Response(json.dumps({'error': 'Not found'}), status=404, mimetype='application/json')
+    return Response(json.dumps({'status': 'ok'}), mimetype='application/json')
 
 
 @app.route('/plot/stop', methods=['POST'])

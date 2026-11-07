@@ -505,6 +505,7 @@ button:disabled {
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 320px);
   grid-template-areas:
     "library preview control"
+    "queue queue queue"
     "log log log";
   gap: 1.5rem;
   margin-top: 0.75rem;
@@ -811,6 +812,49 @@ html[data-theme="dark"] #svg-object svg rect {
 .log-panel {
   grid-area: log;
   padding: 1.2rem 1.35rem;
+}
+
+.queue-panel {
+  grid-area: queue;
+}
+
+.queue-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.queue-row-actions button {
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  line-height: 1;
+}
+
+/* Center the text cells on the same line as the action buttons. */
+#plot-queue-table th,
+#plot-queue-table td {
+  vertical-align: middle;
+}
+
+.queue-remove-button {
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.queue-remove-button:hover {
+  background: color-mix(in srgb, var(--danger) 22%, var(--panel));
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .log-actions {
@@ -1316,7 +1360,8 @@ ol#files li a.file-link:hover {
   overflow: hidden;
   border: 1px solid var(--frame-border);
   border-radius: 0.75rem;
-  background: var(--panel-strong);
+  /* background: var(--panel-strong); */
+  background-color: rgb(255,255,255);
   box-shadow: var(--shadow);
   align-self: center;
 }
@@ -1513,6 +1558,7 @@ html[data-theme="dark"] {
       "library"
       "preview"
       "control"
+      "queue"
       "log";
   }
 
@@ -1589,4 +1635,11 @@ html[data-theme="dark"] {
   .upload-form input[type="file"] {
     min-width: 0;
   }
+}
+.plot-log-table tbody tr.queue-row--loaded td {
+  background: #fff7cc;
+}
+
+html[data-theme="dark"] .plot-log-table tbody tr.queue-row--loaded td {
+  background: rgba(255, 226, 89, 0.18);
 }
