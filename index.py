@@ -331,7 +331,7 @@ def append_plot_log_entry(entry):
 
 
 def load_plot_log_entries(limit=300):
-    """Load persisted plot log entries from disk (newest first)."""
+    """Load persisted plot log entries from disk (newest first); limit=None loads them all."""
     if not os.path.exists(PLOT_LOG_FILE):
         return []
 
@@ -347,7 +347,63 @@ def load_plot_log_entries(limit=300):
                 except json.JSONDecodeError:
                     continue
 
-    return list(reversed(entries[-limit:]))
+    if limit is not None:
+        entries = entries[-limit:]
+
+    return list(reversed(entries))
+
+
+def as_number(value):
+    """Return value when it is numeric, otherwise 0 (log rows use '-' for missing metrics)."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    return 0
+
+
+def format_duration_hhmm(total_seconds):
+    """Format a duration as 'HH:MM', or 'Nd HH:MM' once it is longer than 48 hours."""
+    total_minutes = round(total_seconds / 60)
+
+    if total_minutes > 48 * 60:
+        days, remainder = divmod(total_minutes, 24 * 60)
+        hours, minutes = divmod(remainder, 60)
+        return f"{days}d {hours:02d}:{minutes:02d}"
+
+    hours, minutes = divmod(total_minutes, 60)
+    return f"{hours:02d}:{minutes:02d}"
+
+
+def compute_plotter_stats(entries):
+    """Total the completed plots in the log per plotter, busiest machine first."""
+    totals = {}
+
+    for entry in entries:
+        if entry.get('status') != 'ok':
+            continue
+
+        name = entry.get('plotter') or 'Unknown'
+        machine = totals.setdefault(name, {
+            'plotter': name,
+            'plots': 0,
+            'lifts': 0,
+            'duration': 0,
+            'path': 0.0,
+            'travel': 0.0,
+        })
+        machine['plots'] += 1
+        machine['lifts'] += as_number(entry.get('lifts'))
+        machine['duration'] += as_number(entry.get('duration'))
+        machine['path'] += as_number(entry.get('path'))
+        machine['travel'] += as_number(entry.get('travel'))
+
+    stats = sorted(totals.values(), key=lambda machine: (-machine['plots'], machine['plotter'].lower()))
+
+    for machine in stats:
+        machine['duration_text'] = format_duration_hhmm(machine['duration'])
+        machine['path'] = round(machine['path'])
+        machine['travel'] = round(machine['travel'])
+
+    return stats
 
 
 def clear_plot_log_entries():
@@ -440,6 +496,16 @@ def index():
 def monitor():
     """Render the read-only, phone-friendly plotter status page."""
     return render_template('monitor.html')
+
+
+@app.route('/stats')
+def stats():
+    """Render lifetime totals for each plotter, computed from the plot log."""
+    return render_template(
+        'stats.html',
+        machines=compute_plotter_stats(load_plot_log_entries(limit=None)),
+    )
+
 
 # Define route for a plot request
 @app.route('/plot/<path:file>', methods=['GET', 'POST'])

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Plotter Stats</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <link rel="stylesheet" type="text/css" href="/static/style.css">
+    <link rel="stylesheet" type="text/css" href="/static/stats.css">
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/images/favicon-16x16.png">
+    <link rel="manifest" href="/static/site.webmanifest">
+    <script>
+        (() => {
+            const storedTheme = localStorage.getItem('plot-server-theme');
+            const preferredTheme = storedTheme || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.dataset.theme = preferredTheme;
+        })();
+    </script>
+</head>
+<body class="stats">
+    <main class="stats-shell">
+        <header class="stats-header">
+            <div>
+                <p class="eyebrow">Plot Log</p>
+                <h1>Plotter Stats</h1>
+            </div>
+            <a class="stats-back" href="/">&larr; Plot Server</a>
+        </header>
+
+        {% for machine in machines %}
+        <section class="card stats-machine" aria-label="{{ machine.plotter }}">
+            <h2>{{ machine.plotter }}</h2>
+            <dl class="stats-grid">
+                <div class="info-tile">
+                    <dt class="info-tile__label">Plots</dt>
+                    <dd class="stats-value">{{ '{:,}'.format(machine.plots) }}</dd>
+                </div>
+                <div class="info-tile">
+                    <dt class="info-tile__label">Lifts</dt>
+                    <dd class="stats-value">{{ '{:,}'.format(machine.lifts) }}</dd>
+                </div>
+                <div class="info-tile">
+                    <dt class="info-tile__label">Plot time</dt>
+                    <dd class="stats-value">{{ machine.duration_text }}</dd>
+                </div>
+                <div class="info-tile">
+                    <dt class="info-tile__label">Path distance</dt>
+                    <dd class="stats-value">{{ '{:,}'.format(machine.path) }} m</dd>
+                </div>
+                <div class="info-tile">
+                    <dt class="info-tile__label">Travel distance</dt>
+                    <dd class="stats-value">{{ '{:,}'.format(machine.travel) }} m</dd>
+                </div>
+            </dl>
+        </section>
+        {% else %}
+        <section class="card stats-empty">No completed plots in the log yet.</section>
+        {% endfor %}
+
+        <p class="stats-note">Totals come from the plot log, so clearing the log resets them.</p>
+    </main>
+</body>
+</html>

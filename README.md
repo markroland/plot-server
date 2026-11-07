@@ -71,3 +71,7 @@ status page. While a plot is running it shows the plot's thumbnail, a countdown 
 the estimated finish time, and a progress bar with time elapsed and remaining.
 It has no controls, so it is safe to leave open.
 The server's network address and port are shown in the footer of the main page.
+
+### View Machine Stats
+
+Open `/stats` to view information about each machine that has been logged.

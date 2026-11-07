@@ -813,7 +813,14 @@ html[data-theme="dark"] #svg-object svg rect {
   padding: 1.2rem 1.35rem;
 }
 
-.clear-log-button {
+.log-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clear-log-button,
+.log-stats-link {
   min-height: 2.2rem;
   padding: 0.45rem 0.85rem;
   border-radius: 0.75rem;
@@ -823,7 +830,14 @@ html[data-theme="dark"] #svg-object svg rect {
   font-weight: 700;
 }
 
-.clear-log-button:hover {
+.log-stats-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.clear-log-button:hover,
+.log-stats-link:hover {
   background: var(--copy-button-bg-hover);
 }
 
